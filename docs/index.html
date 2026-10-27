@@ -5,174 +5,228 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>風扇背心控制</title>
 <meta name="description" content="用手機藍牙控制溫控風扇背心：即時溫度、自動與手動風速。">
-<meta name="theme-color" content="#1d2430">
+<meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --ground: #f3efe7;
-    --surface: #ffffff;
-    --ink: #1d2430;
-    --ink-2: #4a5363;
-    --line: #ddd6c8;
-    --shell: #1d2430;
-    --on-shell: #f3efe7;
-    --on-shell-2: #b9c0cc;
-    --accent: #c2410c;
-    --accent-press: #9a3412;
-    --heat: #f97316;
-    --cool: #2563eb;
-    --ok: #15803d;
-    --warn-bg: #fff4e5;
-    --warn-ink: #8a3b00;
-    --err-bg: #fdecec;
-    --err-ink: #a11a1a;
-    --radius: 14px;
-    --shadow: 0 1px 2px rgba(29, 36, 48, .06), 0 6px 18px rgba(29, 36, 48, .07);
-    --num: "Barlow Semi Condensed", "Noto Sans TC", system-ui, sans-serif;
-    --text: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
-    color-scheme: light;
+    --bg: #000000;
+    --surface: #101318;
+    --surface-2: #181c23;
+    --line: #232833;
+    --text: #f8fafc;
+    --text-2: #a3adbd;
+    --cool: #38bdf8;
+    --warm: #fbbf24;
+    --hot: #fb923c;
+    --peak: #f87171;
+    --idle: #4b5563;
+    --ok: #22c55e;
+    --accent: #fb923c;
+    --accent-press: #f97316;
+    --warn-bg: #2a1f05;
+    --warn-ink: #fcd34d;
+    --err-bg: #2b0f12;
+    --err-ink: #fca5a5;
+    --tc: var(--idle);         /* 隨溫度變色，由 JS 設定 */
+    --radius: 20px;
+    --num: "Inter", "Noto Sans TC", system-ui, sans-serif;
+    --font: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; background: var(--bg); }
   body {
     margin: 0;
-    background: var(--ground);
-    color: var(--ink);
-    font: 400 16px/1.55 var(--text);
+    background: var(--bg);
+    color: var(--text);
+    font: 400 16px/1.55 var(--font);
     min-height: 100dvh;
   }
-  ::selection { background: #fed7aa; color: var(--ink); }
-  :focus-visible { outline: 3px solid var(--heat); outline-offset: 2px; border-radius: 6px; }
+  ::selection { background: rgba(251, 146, 60, .35); color: var(--text); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
 
   /* ---- 頂欄 ---- */
   .bar {
-    background: var(--shell);
-    color: var(--on-shell);
-    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
     position: sticky;
     top: 0;
     z-index: 2;
+    background: rgba(0, 0, 0, .92);
+    border-bottom: 1px solid var(--line);
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
   }
-  .bar-inner {
-    max-width: 520px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .brand { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .02em; }
-  .brand svg { width: 26px; height: 26px; }
+  .bar-inner { max-width: 520px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .02em; }
+  .brand svg { width: 24px; height: 24px; }
   .link {
     margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 8px;
     font-size: 14px;
-    color: var(--on-shell-2);
+    color: var(--text-2);
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
   }
-  .link-dot { width: 9px; height: 9px; border-radius: 50%; background: #6b7280; transition: background-color .3s; }
-  .link[data-state="connected"] { color: var(--on-shell); }
-  .link[data-state="connected"] .link-dot { background: #4ade80; }
+  .link-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); transition: background-color .3s, box-shadow .3s; }
+  .link[data-state="connected"] { color: var(--text); }
+  .link[data-state="connected"] .link-dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
   .link[data-state="connecting"] .link-dot,
-  .link[data-state="lost"] .link-dot { background: #fbbf24; animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { opacity: .35; } }
+  .link[data-state="lost"] .link-dot { background: var(--warm); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
 
   main { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(28px + env(safe-area-inset-bottom)); display: grid; gap: 14px; }
-
-  .panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  h2 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 700; }
 
   /* ---- 連線 ---- */
   .connect { display: grid; gap: 12px; }
-  .connect h2 { margin: 0; font-size: 20px; line-height: 1.3; }
-  .connect p { margin: 0; color: var(--ink-2); }
-  button {
-    font: inherit;
-    cursor: pointer;
-    border: 0;
-    border-radius: 12px;
-    min-height: 48px;
-    padding: 0 18px;
-  }
+  .connect h2 { font-size: 20px; }
+  .connect p { margin: 0; color: var(--text-2); }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 14px; min-height: 48px; padding: 0 18px; }
   .primary {
     background: var(--accent);
-    color: #fff;
+    color: #000;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: background-color .15s;
+    transition: background-color .15s, transform .1s;
   }
   .primary:hover { background: var(--accent-press); }
-  .primary:active { transform: translateY(1px); }
-  .primary:disabled { background: #d6cfc3; color: #6b6458; cursor: default; transform: none; }
+  .primary:active { transform: scale(.98); }
+  .primary:disabled { background: var(--surface-2); color: var(--text-2); cursor: default; transform: none; }
   .primary svg { width: 20px; height: 20px; }
-  .ghost { background: transparent; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; min-height: 40px; padding: 0 4px; justify-self: start; }
-  .ghost:hover { color: var(--ink); }
+  .ghost { background: transparent; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; justify-self: center; }
+  .ghost:hover { color: var(--text); }
 
-  .notice { border-radius: 12px; padding: 12px 14px; font-size: 15px; }
+  .notice { border-radius: 14px; padding: 12px 14px; font-size: 15px; }
   .notice.warn { background: var(--warn-bg); color: var(--warn-ink); }
   .notice.err { background: var(--err-bg); color: var(--err-ink); }
   .notice p { margin: 0; }
 
-  /* ---- 讀數 ---- */
-  .readings { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
-  .reading { padding: 4px 0; }
-  .reading + .reading { border-left: 1px solid var(--line); padding-left: 18px; }
-  .label { font-size: 14px; color: var(--ink-2); margin: 0 0 2px; }
-  .value { font-family: var(--num); font-weight: 600; font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin: 0; }
-  .unit { font-size: 22px; font-weight: 500; color: var(--ink-2); margin-left: 3px; }
-  .hint { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 15px; }
-
-  /* ---- 曲線 ---- */
-  .curve h2, .control h2 { margin: 0 0 4px; font-size: 17px; line-height: 1.3; }
-  .curve .sub { margin: 0 0 10px; font-size: 14px; color: var(--ink-2); }
-  .curve svg { display: block; width: 100%; height: auto; overflow: visible; }
-  .axis { stroke: var(--line); stroke-width: 1; }
-  .tick { fill: var(--ink-2); font: 500 11px var(--num); font-variant-numeric: tabular-nums; }
-  .band { fill: #fde8d7; }
-  .path { fill: none; stroke: var(--heat); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; transition: opacity .3s; }
-  .path.dim { opacity: .3; }
-  .manual-line { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 5 4; transition: opacity .3s; }
-  .marker { transition: transform .9s cubic-bezier(.16, 1, .3, 1); }
-  .marker circle.ring { fill: rgba(249, 115, 22, .18); }
-  .marker circle.core { fill: var(--heat); stroke: #fff; stroke-width: 2.5; }
-  .marker-guide { stroke: var(--heat); stroke-width: 1; stroke-dasharray: 2 3; }
+  /* ---- 儀表 ---- */
+  .gauge-panel { padding: 22px 18px 18px; }
+  .gauge { position: relative; width: min(100%, 300px); margin: 0 auto; aspect-ratio: 1; }
+  .gauge > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .track { fill: none; stroke: var(--surface-2); stroke-width: 16; stroke-linecap: round; }
+  .arc {
+    fill: none;
+    stroke: var(--tc);
+    stroke-width: 16;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px var(--tc));
+    transition: stroke-dasharray .9s cubic-bezier(.16, 1, .3, 1), stroke .6s;
+  }
+  .gauge-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    text-align: center;
+    gap: 2px;
+    padding-bottom: 6%;
+  }
+  .g-label { font-size: 14px; color: var(--text-2); }
+  .g-temp { font-family: var(--num); font-weight: 600; font-size: clamp(52px, 17vw, 68px); line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .g-temp .unit { font-size: .38em; font-weight: 500; color: var(--text-2); margin-left: 2px; letter-spacing: 0; }
+  .g-level {
+    margin-top: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--tc);
+    transition: color .6s;
+    min-height: 1.5em;
+  }
+  .g-fan {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 4%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    color: var(--text-2);
+  }
+  .g-fan strong { font-family: var(--num); font-weight: 600; font-size: 22px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .fan-icon { width: 22px; height: 22px; color: var(--tc); transition: color .6s; animation: spin 1s linear infinite; animation-play-state: paused; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hint { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--text-2); font-size: 15px; text-align: center; }
 
   /* ---- 控制 ---- */
   .segmented {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    background: var(--ground);
-    border-radius: 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 14px;
     padding: 4px;
-    margin-top: 10px;
+    margin-top: 12px;
   }
-  .segmented button {
-    min-height: 44px;
-    background: transparent;
-    color: var(--ink-2);
-    font-weight: 500;
-    border-radius: 9px;
-  }
-  .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(29, 36, 48, .14); }
+  .segmented button { min-height: 44px; background: transparent; color: var(--text-2); font-weight: 500; border-radius: 10px; transition: background-color .2s, color .2s; }
+  .segmented button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); font-weight: 700; box-shadow: inset 0 0 0 1px #343b48; }
   .segmented button:disabled { cursor: default; }
-  .slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 18px; }
+  .slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; }
+  .slider-head label { color: var(--text-2); }
   .slider-head output { font-family: var(--num); font-weight: 600; font-size: 24px; font-variant-numeric: tabular-nums; }
-  input[type="range"] { width: 100%; height: 44px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
-  input[type="range"]:disabled { cursor: default; opacity: .45; }
-  .slider-note { margin: 0; font-size: 14px; color: var(--ink-2); }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 44px;
+    margin: 2px 0 0;
+    background: transparent;
+    cursor: pointer;
+    --fill: 50%;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--accent) var(--fill), var(--surface-2) var(--fill));
+  }
+  input[type="range"]::-moz-range-track { height: 8px; border-radius: 999px; background: var(--surface-2); }
+  input[type="range"]::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--accent); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 28px;
+    height: 28px;
+    margin-top: -10px;
+    border-radius: 50%;
+    background: var(--text);
+    border: 4px solid var(--accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .6);
+  }
+  input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--text); border: 4px solid var(--accent); }
+  input[type="range"]:disabled { cursor: default; opacity: .35; }
+  .slider-note { margin: 0; font-size: 14px; color: var(--text-2); }
 
-  .foot { text-align: center; font-size: 13px; color: var(--ink-2); margin: 4px 0 0; }
+  /* ---- 曲線 ---- */
+  .curve .sub { margin: 4px 0 10px; font-size: 14px; color: var(--text-2); }
+  .curve svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .axis { stroke: var(--line); stroke-width: 1; }
+  .tick { fill: var(--text-2); font: 500 11px var(--num); font-variant-numeric: tabular-nums; }
+  .band { fill: rgba(56, 189, 248, .12); }
+  .path { fill: none; stroke: var(--hot); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; transition: opacity .3s; }
+  .path.dim { opacity: .3; }
+  .manual-line { stroke: var(--text); stroke-width: 2; stroke-dasharray: 5 4; transition: opacity .3s; }
+  .marker { transition: transform .9s cubic-bezier(.16, 1, .3, 1); }
+  .marker circle.ring { fill: var(--tc); opacity: .22; }
+  .marker circle.core { fill: var(--tc); stroke: var(--bg); stroke-width: 2.5; }
+  .marker-guide { stroke: var(--tc); stroke-width: 1; stroke-dasharray: 2 3; }
 
+  .foot { text-align: center; font-size: 13px; color: var(--text-2); margin: 0; }
   [hidden] { display: none !important; }
 
   @media (prefers-reduced-motion: reduce) {
-    .marker, .path, .manual-line, .link-dot { transition: none; animation: none; }
+    .arc, .marker, .path, .manual-line, .link-dot, .fan-icon { transition: none; animation: none; }
   }
 </style>
 </head>
@@ -180,7 +234,7 @@
 <header class="bar">
   <div class="bar-inner">
     <h1 class="brand">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c4 0 6 3.2 5 6.4-.7 2.3-3 3.4-5 3.6M29 16c0 4-3.2 6-6.4 5-2.3-.7-3.4-3-3.6-5M16 29c-4 0-6-3.2-5-6.4.7-2.3 3-3.4 5-3.6M3 16c0-4 3.2-6 6.4-5 2.3.7 3.4 3 3.6 5" fill="none" stroke="#f97316" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="#f3efe7"/></svg>
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c4 0 6 3.2 5 6.4-.7 2.3-3 3.4-5 3.6M29 16c0 4-3.2 6-6.4 5-2.3-.7-3.4-3-3.6-5M16 29c-4 0-6-3.2-5-6.4.7-2.3 3-3.4 5-3.6M3 16c0-4 3.2-6 6.4-5 2.3.7 3.4 3 3.6 5" fill="none" stroke="#fb923c" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="#f8fafc"/></svg>
       風扇背心
     </h1>
     <span class="link" id="link" data-state="idle" role="status" aria-live="polite"><span class="link-dot"></span><span id="linkText">未連線</span></span>
@@ -201,27 +255,26 @@
     </button>
   </section>
 
-  <section class="panel" aria-label="即時讀數">
-    <div class="readings">
-      <div class="reading">
-        <p class="label">背心內溫度</p>
-        <p class="value"><span id="temp">--</span><span class="unit">°C</span></p>
+  <section class="panel gauge-panel" aria-label="即時讀數">
+    <div class="gauge" id="gauge">
+      <svg viewBox="0 0 240 240" aria-hidden="true">
+        <path class="track" d="M49.29 190.71 A100 100 0 1 1 190.71 190.71"/>
+        <path class="arc" id="arc" d="M49.29 190.71 A100 100 0 1 1 190.71 190.71" pathLength="100" stroke-dasharray="0 100"/>
+      </svg>
+      <div class="gauge-center">
+        <span class="g-label">背心內溫度</span>
+        <span class="g-temp"><span id="temp">—</span><span class="unit">°C</span></span>
+        <span class="g-level" id="level"></span>
       </div>
-      <div class="reading">
-        <p class="label">風速</p>
-        <p class="value"><span id="pct">--</span><span class="unit">%</span></p>
+      <div class="g-fan">
+        <svg class="fan-icon" id="fanIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c3 0 4.5 2.4 3.8 4.8-.5 1.7-2.2 2.6-3.8 2.7M21.5 12c0 3-2.4 4.5-4.8 3.8-1.7-.5-2.6-2.2-2.7-3.8M12 21.5c-3 0-4.5-2.4-3.8-4.8.5-1.7 2.2-2.6 3.8-2.7M2.5 12c0-3 2.4-4.5 4.8-3.8 1.7.5 2.6 2.2 2.7 3.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>
+        <span>風速</span><strong><span id="pct">—</span>%</strong>
       </div>
     </div>
     <div class="notice warn" id="sensorError" hidden style="margin-top:14px">
       <p id="sensorErrorText">溫度感測器沒有回應，風扇暫以安全轉速運轉。請檢查感測器接線。</p>
     </div>
     <p class="hint" id="hint">連線後會顯示即時溫度與風速。</p>
-  </section>
-
-  <section class="panel curve" aria-labelledby="curveTitle">
-    <h2 id="curveTitle">溫度與風速</h2>
-    <p class="sub" id="curveSub">自動模式依這條曲線調整風速，橘點是現在的位置。</p>
-    <svg id="chart" viewBox="0 0 340 190" role="img" aria-label="溫度對應風速曲線"></svg>
   </section>
 
   <section class="panel control" aria-labelledby="controlTitle">
@@ -236,6 +289,12 @@
     </div>
     <input type="range" id="slider" min="0" max="100" step="5" value="50" disabled>
     <p class="slider-note" id="sliderNote">切換到手動模式後可以拖曳調整。</p>
+  </section>
+
+  <section class="panel curve" aria-labelledby="curveTitle">
+    <h2 id="curveTitle">溫度與風速</h2>
+    <p class="sub" id="curveSub">自動模式依這條曲線調整風速，圓點是現在的位置。</p>
+    <svg id="chart" viewBox="0 0 340 190" role="img" aria-label="溫度對應風速曲線"></svg>
   </section>
 
   <button class="ghost" id="disconnectBtn" type="button" hidden>中斷連線</button>
@@ -256,7 +315,8 @@
     link: $('link'), linkText: $('linkText'),
     connectPanel: $('connectPanel'), connectText: $('connectText'), connectBtn: $('connectBtn'), connectBtnText: $('connectBtnText'),
     unsupported: $('unsupported'), connectError: $('connectError'), connectErrorText: $('connectErrorText'),
-    temp: $('temp'), pct: $('pct'), hint: $('hint'), sensorError: $('sensorError'), sensorErrorText: $('sensorErrorText'),
+    gauge: $('gauge'), arc: $('arc'), temp: $('temp'), level: $('level'), pct: $('pct'), fanIcon: $('fanIcon'),
+    hint: $('hint'), sensorError: $('sensorError'), sensorErrorText: $('sensorErrorText'),
     chart: $('chart'), curveSub: $('curveSub'),
     modeAuto: $('modeAuto'), modeManual: $('modeManual'),
     slider: $('slider'), sliderOut: $('sliderOut'), sliderNote: $('sliderNote'),
@@ -269,6 +329,16 @@
     cfg: { t0: 27, t1: 28, t2: 35, dmin: 30, fail: 70 },
   };
   let device = null, controlChar = null, userDisconnect = false, dragging = false;
+
+  // 溫度分級：顏色＋文字，不只靠顏色辨識
+  function tempLevel(t) {
+    const { t1, t2 } = state.cfg;
+    if (t === null) return { color: 'var(--idle)', text: '' };
+    if (t < t1) return { color: 'var(--cool)', text: '涼爽' };
+    if (t < (t1 + t2) / 2) return { color: 'var(--warm)', text: '溫暖' };
+    if (t < t2) return { color: 'var(--hot)', text: '炎熱' };
+    return { color: 'var(--peak)', text: '高溫・全速散熱' };
+  }
 
   // ---------- 曲線圖 ----------
   const C = { x0: 34, x1: 326, y0: 160, y1: 14, tmin: 20, tmax: 40 };
@@ -323,9 +393,24 @@
     }
   }
 
+  // ---------- 儀表 ----------
+  function drawGauge(live) {
+    const pct = live && state.pct !== null ? state.pct : 0;
+    const level = tempLevel(live ? state.temp : null);
+    document.documentElement.style.setProperty('--tc', level.color);
+    ui.arc.setAttribute('stroke-dasharray', `${pct} 100`);
+    ui.arc.style.opacity = pct > 0 ? 1 : 0;
+    ui.level.textContent = level.text;
+    // 風扇圖示轉速跟著風速：越快轉一圈越短
+    ui.fanIcon.style.animationDuration = pct > 0 ? (1.8 - pct / 100 * 1.5).toFixed(2) + 's' : '1s';
+    ui.fanIcon.style.animationPlayState = pct > 0 ? 'running' : 'paused';
+  }
+
   // ---------- 畫面 ----------
-  const LINK_TEXT = { idle: '未連線', connecting: '連線中…', connected: '已連線', lost: '訊號中斷，重新連線中…' };
+  const LINK_TEXT = { idle: '未連線', connecting: '連線中…', connected: '已連線', lost: '重新連線中…' };
   const fmtT = t => (Math.round(t * 10) / 10).toFixed(1);
+
+  function setSliderFill() { ui.slider.style.setProperty('--fill', ui.slider.value + '%'); }
 
   function render() {
     const live = state.link === 'connected';
@@ -337,23 +422,25 @@
     ui.connectBtnText.textContent = state.link === 'connecting' ? '連線中…' : state.link === 'lost' ? '重新連線中…' : '連線裝置';
 
     const sensorBad = live && state.temp === null;
-    ui.temp.textContent = live && state.temp !== null ? fmtT(state.temp) : '--';
-    ui.pct.textContent = live && state.pct !== null ? state.pct : '--';
+    ui.temp.textContent = live && state.temp !== null ? fmtT(state.temp) : '—';
+    ui.pct.textContent = live && state.pct !== null ? state.pct : '—';
     ui.sensorError.hidden = !sensorBad;
     const { t1, t2, fail } = state.cfg;
     ui.sensorErrorText.textContent = `溫度感測器沒有回應，風扇暫以 ${fail}% 安全轉速運轉。請檢查感測器接線。`;
     if (!live) ui.hint.textContent = '連線後會顯示即時溫度與風速。';
-    else if (state.auto) ui.hint.textContent = `自動模式：${t1}°C 以上開始送風，溫度越高風越強，${t2}°C 全速。`;
-    else ui.hint.textContent = '手動模式：風速由下方滑桿決定，不受溫度影響。';
+    else if (state.auto) ui.hint.textContent = `自動模式：${t1}°C 以上開始送風，${t2}°C 全速。`;
+    else ui.hint.textContent = '手動模式：風速由滑桿決定，不受溫度影響。';
     ui.curveSub.textContent = state.auto || !live
-      ? '自動模式依這條曲線調整風速，橘點是現在的位置。淺色區是遲滯區：風扇轉動後要降到更低溫才會停。'
+      ? '自動模式依這條曲線調整風速，圓點是現在的位置。藍色區是遲滯區：風扇轉動後要降到更低溫才會停。'
       : '手動模式中，虛線是你設定的風速；曲線僅供參考。';
+    drawGauge(live);
 
     ui.modeAuto.disabled = ui.modeManual.disabled = !live;
     ui.modeAuto.setAttribute('aria-pressed', state.auto);
     ui.modeManual.setAttribute('aria-pressed', !state.auto);
     ui.slider.disabled = !live || state.auto;
     if (!dragging) { ui.slider.value = state.manual; ui.sliderOut.textContent = state.manual + '%'; }
+    setSliderFill();
     ui.sliderNote.textContent = !live ? '連線後可以使用。' : state.auto ? '切換到手動模式後可以拖曳調整。' : `低於 ${state.cfg.dmin}% 時風扇可能轉不動，會自動提高到 ${state.cfg.dmin}%；拉到 0 為停止。`;
     drawChart();
   }
@@ -456,12 +543,12 @@
   }
   function startDemo() {
     buildChart();
-    state.temp = 29.4;
+    state.temp = 31.5;
     setLink('connected');
     demoApply();
     demoTimer = setInterval(() => {
       demoClock += 1;
-      state.temp = 30 + 4.5 * Math.sin(demoClock / 9) + (Math.random() - .5) * .3;
+      state.temp = 31 + 5 * Math.sin(demoClock / 9) + (Math.random() - .5) * .3;
       demoApply();
     }, 1000);
     ui.foot.textContent = '示範模式：溫度為模擬資料。';
@@ -479,6 +566,7 @@
   ui.slider.addEventListener('input', () => {
     state.manual = Number(ui.slider.value);
     ui.sliderOut.textContent = state.manual + '%';
+    setSliderFill();
     clearTimeout(sendTimer);
     sendTimer = setTimeout(sendControl, 120);  // 拖曳時節流，避免塞爆藍牙
   });

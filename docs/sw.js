@@ -1,5 +1,5 @@
 // 離線快取：開過一次之後，戶外沒有網路也能打開控制頁（藍牙本身不需要網路）
-const CACHE = 'fanvest-v1';
+const CACHE = 'fanvest-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', e => {
