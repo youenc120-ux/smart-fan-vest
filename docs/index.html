@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>風扇背心控制</title>
+<meta name="description" content="用手機藍牙控制溫控風扇背心：即時溫度、自動與手動風速。">
+<meta name="theme-color" content="#1d2430">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #f3efe7;
+    --surface: #ffffff;
+    --ink: #1d2430;
+    --ink-2: #4a5363;
+    --line: #ddd6c8;
+    --shell: #1d2430;
+    --on-shell: #f3efe7;
+    --on-shell-2: #b9c0cc;
+    --accent: #c2410c;
+    --accent-press: #9a3412;
+    --heat: #f97316;
+    --cool: #2563eb;
+    --ok: #15803d;
+    --warn-bg: #fff4e5;
+    --warn-ink: #8a3b00;
+    --err-bg: #fdecec;
+    --err-ink: #a11a1a;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(29, 36, 48, .06), 0 6px 18px rgba(29, 36, 48, .07);
+    --num: "Barlow Semi Condensed", "Noto Sans TC", system-ui, sans-serif;
+    --text: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16px/1.55 var(--text);
+    min-height: 100dvh;
+  }
+  ::selection { background: #fed7aa; color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--heat); outline-offset: 2px; border-radius: 6px; }
+
+  /* ---- 頂欄 ---- */
+  .bar {
+    background: var(--shell);
+    color: var(--on-shell);
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .bar-inner {
+    max-width: 520px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+  .brand svg { width: 26px; height: 26px; }
+  .link {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--on-shell-2);
+  }
+  .link-dot { width: 9px; height: 9px; border-radius: 50%; background: #6b7280; transition: background-color .3s; }
+  .link[data-state="connected"] { color: var(--on-shell); }
+  .link[data-state="connected"] .link-dot { background: #4ade80; }
+  .link[data-state="connecting"] .link-dot,
+  .link[data-state="lost"] .link-dot { background: #fbbf24; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  main { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(28px + env(safe-area-inset-bottom)); display: grid; gap: 14px; }
+
+  .panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+
+  /* ---- 連線 ---- */
+  .connect { display: grid; gap: 12px; }
+  .connect h2 { margin: 0; font-size: 20px; line-height: 1.3; }
+  .connect p { margin: 0; color: var(--ink-2); }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 0;
+    border-radius: 12px;
+    min-height: 48px;
+    padding: 0 18px;
+  }
+  .primary {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color .15s;
+  }
+  .primary:hover { background: var(--accent-press); }
+  .primary:active { transform: translateY(1px); }
+  .primary:disabled { background: #d6cfc3; color: #6b6458; cursor: default; transform: none; }
+  .primary svg { width: 20px; height: 20px; }
+  .ghost { background: transparent; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; min-height: 40px; padding: 0 4px; justify-self: start; }
+  .ghost:hover { color: var(--ink); }
+
+  .notice { border-radius: 12px; padding: 12px 14px; font-size: 15px; }
+  .notice.warn { background: var(--warn-bg); color: var(--warn-ink); }
+  .notice.err { background: var(--err-bg); color: var(--err-ink); }
+  .notice p { margin: 0; }
+
+  /* ---- 讀數 ---- */
+  .readings { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .reading { padding: 4px 0; }
+  .reading + .reading { border-left: 1px solid var(--line); padding-left: 18px; }
+  .label { font-size: 14px; color: var(--ink-2); margin: 0 0 2px; }
+  .value { font-family: var(--num); font-weight: 600; font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin: 0; }
+  .unit { font-size: 22px; font-weight: 500; color: var(--ink-2); margin-left: 3px; }
+  .hint { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 15px; }
+
+  /* ---- 曲線 ---- */
+  .curve h2, .control h2 { margin: 0 0 4px; font-size: 17px; line-height: 1.3; }
+  .curve .sub { margin: 0 0 10px; font-size: 14px; color: var(--ink-2); }
+  .curve svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .axis { stroke: var(--line); stroke-width: 1; }
+  .tick { fill: var(--ink-2); font: 500 11px var(--num); font-variant-numeric: tabular-nums; }
+  .band { fill: #fde8d7; }
+  .path { fill: none; stroke: var(--heat); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; transition: opacity .3s; }
+  .path.dim { opacity: .3; }
+  .manual-line { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 5 4; transition: opacity .3s; }
+  .marker { transition: transform .9s cubic-bezier(.16, 1, .3, 1); }
+  .marker circle.ring { fill: rgba(249, 115, 22, .18); }
+  .marker circle.core { fill: var(--heat); stroke: #fff; stroke-width: 2.5; }
+  .marker-guide { stroke: var(--heat); stroke-width: 1; stroke-dasharray: 2 3; }
+
+  /* ---- 控制 ---- */
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--ground);
+    border-radius: 12px;
+    padding: 4px;
+    margin-top: 10px;
+  }
+  .segmented button {
+    min-height: 44px;
+    background: transparent;
+    color: var(--ink-2);
+    font-weight: 500;
+    border-radius: 9px;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(29, 36, 48, .14); }
+  .segmented button:disabled { cursor: default; }
+  .slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 18px; }
+  .slider-head output { font-family: var(--num); font-weight: 600; font-size: 24px; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; height: 44px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+  input[type="range"]:disabled { cursor: default; opacity: .45; }
+  .slider-note { margin: 0; font-size: 14px; color: var(--ink-2); }
+
+  .foot { text-align: center; font-size: 13px; color: var(--ink-2); margin: 4px 0 0; }
+
+  [hidden] { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marker, .path, .manual-line, .link-dot { transition: none; animation: none; }
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <h1 class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c4 0 6 3.2 5 6.4-.7 2.3-3 3.4-5 3.6M29 16c0 4-3.2 6-6.4 5-2.3-.7-3.4-3-3.6-5M16 29c-4 0-6-3.2-5-6.4.7-2.3 3-3.4 5-3.6M3 16c0-4 3.2-6 6.4-5 2.3.7 3.4 3 3.6 5" fill="none" stroke="#f97316" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="#f3efe7"/></svg>
+      風扇背心
+    </h1>
+    <span class="link" id="link" data-state="idle" role="status" aria-live="polite"><span class="link-dot"></span><span id="linkText">未連線</span></span>
+  </div>
+</header>
+
+<main>
+  <section class="panel connect" id="connectPanel" aria-labelledby="connectTitle">
+    <h2 id="connectTitle">連線到背心</h2>
+    <p id="connectText">打開背心電源與手機藍牙，再點下方按鈕，從清單選擇「FanVest」。</p>
+    <div class="notice err" id="unsupported" hidden>
+      <p>這個瀏覽器不支援藍牙網頁連線。Android 請用 Chrome 開啟本頁；iPhone 請改用 Bluefy 瀏覽器。</p>
+    </div>
+    <div class="notice err" id="connectError" hidden><p id="connectErrorText"></p></div>
+    <button class="primary" id="connectBtn" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 5V2l5 5L7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span id="connectBtnText">連線裝置</span>
+    </button>
+  </section>
+
+  <section class="panel" aria-label="即時讀數">
+    <div class="readings">
+      <div class="reading">
+        <p class="label">背心內溫度</p>
+        <p class="value"><span id="temp">--</span><span class="unit">°C</span></p>
+      </div>
+      <div class="reading">
+        <p class="label">風速</p>
+        <p class="value"><span id="pct">--</span><span class="unit">%</span></p>
+      </div>
+    </div>
+    <div class="notice warn" id="sensorError" hidden style="margin-top:14px">
+      <p id="sensorErrorText">溫度感測器沒有回應，風扇暫以安全轉速運轉。請檢查感測器接線。</p>
+    </div>
+    <p class="hint" id="hint">連線後會顯示即時溫度與風速。</p>
+  </section>
+
+  <section class="panel curve" aria-labelledby="curveTitle">
+    <h2 id="curveTitle">溫度與風速</h2>
+    <p class="sub" id="curveSub">自動模式依這條曲線調整風速，橘點是現在的位置。</p>
+    <svg id="chart" viewBox="0 0 340 190" role="img" aria-label="溫度對應風速曲線"></svg>
+  </section>
+
+  <section class="panel control" aria-labelledby="controlTitle">
+    <h2 id="controlTitle">控制模式</h2>
+    <div class="segmented" role="group" aria-label="控制模式">
+      <button type="button" id="modeAuto" aria-pressed="true" disabled>自動</button>
+      <button type="button" id="modeManual" aria-pressed="false" disabled>手動</button>
+    </div>
+    <div class="slider-head">
+      <label for="slider">手動風速</label>
+      <output id="sliderOut" for="slider">50%</output>
+    </div>
+    <input type="range" id="slider" min="0" max="100" step="5" value="50" disabled>
+    <p class="slider-note" id="sliderNote">切換到手動模式後可以拖曳調整。</p>
+  </section>
+
+  <button class="ghost" id="disconnectBtn" type="button" hidden>中斷連線</button>
+  <p class="foot" id="foot"></p>
+</main>
+
+<script>
+(() => {
+  const SERVICE = '7a1e0001-5c2b-4f0a-9d3e-6b8f2a4c9e10';
+  const STATUS  = '7a1e0002-5c2b-4f0a-9d3e-6b8f2a4c9e10';
+  const CONTROL = '7a1e0003-5c2b-4f0a-9d3e-6b8f2a4c9e10';
+  const CONFIG  = '7a1e0004-5c2b-4f0a-9d3e-6b8f2a4c9e10';
+  const TEMP_INVALID = -32768;
+  const demo = new URLSearchParams(location.search).has('demo');
+
+  const $ = id => document.getElementById(id);
+  const ui = {
+    link: $('link'), linkText: $('linkText'),
+    connectPanel: $('connectPanel'), connectText: $('connectText'), connectBtn: $('connectBtn'), connectBtnText: $('connectBtnText'),
+    unsupported: $('unsupported'), connectError: $('connectError'), connectErrorText: $('connectErrorText'),
+    temp: $('temp'), pct: $('pct'), hint: $('hint'), sensorError: $('sensorError'), sensorErrorText: $('sensorErrorText'),
+    chart: $('chart'), curveSub: $('curveSub'),
+    modeAuto: $('modeAuto'), modeManual: $('modeManual'),
+    slider: $('slider'), sliderOut: $('sliderOut'), sliderNote: $('sliderNote'),
+    disconnectBtn: $('disconnectBtn'), foot: $('foot'),
+  };
+
+  const state = {
+    link: 'idle',          // idle | connecting | connected | lost
+    temp: null, pct: null, auto: true, manual: 50,
+    cfg: { t0: 27, t1: 28, t2: 35, dmin: 30, fail: 70 },
+  };
+  let device = null, controlChar = null, userDisconnect = false, dragging = false;
+
+  // ---------- 曲線圖 ----------
+  const C = { x0: 34, x1: 326, y0: 160, y1: 14, tmin: 20, tmax: 40 };
+  const sx = t => C.x0 + (Math.min(Math.max(t, C.tmin), C.tmax) - C.tmin) / (C.tmax - C.tmin) * (C.x1 - C.x0);
+  const sy = p => C.y0 - p / 100 * (C.y0 - C.y1);
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+  let chartParts = null;
+
+  function buildChart() {
+    const svg = ui.chart, { t0, t1, t2, dmin } = state.cfg;
+    svg.textContent = '';
+    el('rect', { class: 'band', x: sx(t0), y: C.y1, width: sx(t1) - sx(t0), height: C.y0 - C.y1 }, svg);
+    for (const p of [0, 50, 100]) {
+      el('line', { class: 'axis', x1: C.x0, x2: C.x1, y1: sy(p), y2: sy(p) }, svg);
+      el('text', { class: 'tick', x: C.x0 - 6, y: sy(p) + 4, 'text-anchor': 'end' }, svg).textContent = p + '%';
+    }
+    for (const t of [20, 25, 30, 35, 40]) {
+      el('text', { class: 'tick', x: sx(t), y: C.y0 + 18, 'text-anchor': 'middle' }, svg).textContent = t + '°';
+    }
+    const path = el('path', {
+      class: 'path',
+      d: `M${sx(C.tmin)} ${sy(0)} H${sx(t1)} V${sy(dmin)} L${sx(t2)} ${sy(100)} H${sx(C.tmax)}`,
+    }, svg);
+    const manualLine = el('line', { class: 'manual-line', x1: C.x0, x2: C.x1, y1: sy(50), y2: sy(50), opacity: 0 }, svg);
+    const marker = el('g', { class: 'marker', opacity: 0 }, svg);
+    const guide = el('line', { class: 'marker-guide', x1: 0, x2: 0, y1: 0, y2: 0 }, marker);
+    el('circle', { class: 'ring', r: 13 }, marker);
+    el('circle', { class: 'core', r: 6.5 }, marker);
+    chartParts = { path, manualLine, marker, guide };
+  }
+
+  function drawChart() {
+    const { path, manualLine, marker, guide } = chartParts;
+    const live = state.link === 'connected';
+    path.classList.toggle('dim', live && !state.auto);
+    manualLine.setAttribute('opacity', live && !state.auto ? 1 : 0);
+    manualLine.setAttribute('y1', sy(state.manual));
+    manualLine.setAttribute('y2', sy(state.manual));
+    if (live && state.temp !== null && state.pct !== null) {
+      const x = sx(state.temp), y = sy(state.pct);
+      marker.setAttribute('opacity', 1);
+      marker.style.transform = `translate(${x}px, ${y}px)`;
+      guide.setAttribute('y2', C.y0 - y);
+    } else {
+      marker.setAttribute('opacity', 0);
+    }
+  }
+
+  // ---------- 畫面 ----------
+  const LINK_TEXT = { idle: '未連線', connecting: '連線中…', connected: '已連線', lost: '訊號中斷，重新連線中…' };
+  const fmtT = t => (Math.round(t * 10) / 10).toFixed(1);
+
+  function render() {
+    const live = state.link === 'connected';
+    ui.link.dataset.state = state.link;
+    ui.linkText.textContent = LINK_TEXT[state.link];
+    ui.connectPanel.hidden = live;
+    ui.disconnectBtn.hidden = !live;
+    ui.connectBtn.disabled = state.link === 'connecting' || state.link === 'lost';
+    ui.connectBtnText.textContent = state.link === 'connecting' ? '連線中…' : state.link === 'lost' ? '重新連線中…' : '連線裝置';
+
+    const sensorBad = live && state.temp === null;
+    ui.temp.textContent = live && state.temp !== null ? fmtT(state.temp) : '--';
+    ui.pct.textContent = live && state.pct !== null ? state.pct : '--';
+    ui.sensorError.hidden = !sensorBad;
+    const { t1, t2, fail } = state.cfg;
+    ui.sensorErrorText.textContent = `溫度感測器沒有回應，風扇暫以 ${fail}% 安全轉速運轉。請檢查感測器接線。`;
+    if (!live) ui.hint.textContent = '連線後會顯示即時溫度與風速。';
+    else if (state.auto) ui.hint.textContent = `自動模式：${t1}°C 以上開始送風，溫度越高風越強，${t2}°C 全速。`;
+    else ui.hint.textContent = '手動模式：風速由下方滑桿決定，不受溫度影響。';
+    ui.curveSub.textContent = state.auto || !live
+      ? '自動模式依這條曲線調整風速，橘點是現在的位置。淺色區是遲滯區：風扇轉動後要降到更低溫才會停。'
+      : '手動模式中，虛線是你設定的風速；曲線僅供參考。';
+
+    ui.modeAuto.disabled = ui.modeManual.disabled = !live;
+    ui.modeAuto.setAttribute('aria-pressed', state.auto);
+    ui.modeManual.setAttribute('aria-pressed', !state.auto);
+    ui.slider.disabled = !live || state.auto;
+    if (!dragging) { ui.slider.value = state.manual; ui.sliderOut.textContent = state.manual + '%'; }
+    ui.sliderNote.textContent = !live ? '連線後可以使用。' : state.auto ? '切換到手動模式後可以拖曳調整。' : `低於 ${state.cfg.dmin}% 時風扇可能轉不動，會自動提高到 ${state.cfg.dmin}%；拉到 0 為停止。`;
+    drawChart();
+  }
+
+  function setLink(s) { state.link = s; render(); }
+  function showError(msg) {
+    ui.connectError.hidden = !msg;
+    ui.connectErrorText.textContent = msg || '';
+  }
+
+  // ---------- 藍牙 ----------
+  function parseStatus(dv) {
+    const t = dv.getInt16(0, true);
+    state.temp = t === TEMP_INVALID ? null : t / 10;
+    state.pct = dv.getUint8(2);
+    state.auto = dv.getUint8(3) === 1;
+    if (!dragging) state.manual = dv.getUint8(4);
+    render();
+  }
+
+  function parseConfig(dv) {
+    state.cfg = {
+      t0: dv.getInt16(0, true) / 10, t1: dv.getInt16(2, true) / 10, t2: dv.getInt16(4, true) / 10,
+      dmin: dv.getUint8(6), fail: dv.getUint8(7),
+    };
+    buildChart();
+  }
+
+  async function openGatt() {
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SERVICE);
+    const [statusChar, ctrl, cfgChar] = await Promise.all([
+      svc.getCharacteristic(STATUS), svc.getCharacteristic(CONTROL), svc.getCharacteristic(CONFIG),
+    ]);
+    controlChar = ctrl;
+    parseConfig(await cfgChar.readValue());
+    statusChar.addEventListener('characteristicvaluechanged', e => parseStatus(e.target.value));
+    await statusChar.startNotifications();
+    parseStatus(await statusChar.readValue());
+    setLink('connected');
+  }
+
+  async function connect() {
+    showError('');
+    if (demo) return startDemo();
+    try {
+      setLink('connecting');
+      device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      userDisconnect = false;
+      await openGatt();
+    } catch (err) {
+      setLink('idle');
+      if (err.name === 'NotFoundError') return;  // 使用者取消選擇
+      showError(`連不上背心（${err.message}）。請確認背心電源已開啟、距離在幾公尺內，再試一次。`);
+    }
+  }
+
+  async function onDisconnected() {
+    controlChar = null;
+    if (userDisconnect) { setLink('idle'); return; }
+    setLink('lost');
+    for (const wait of [500, 1500, 3000]) {
+      await new Promise(r => setTimeout(r, wait));
+      try { await openGatt(); return; } catch (_) { /* 再試一次 */ }
+    }
+    setLink('idle');
+    showError('和背心的連線中斷了。請確認背心電源與距離，再點「連線裝置」。');
+  }
+
+  function disconnect() {
+    userDisconnect = true;
+    if (demo) { stopDemo(); setLink('idle'); return; }
+    if (device && device.gatt.connected) device.gatt.disconnect();
+    else setLink('idle');
+  }
+
+  async function sendControl() {
+    const bytes = new Uint8Array([state.auto ? 1 : 0, state.manual]);
+    if (demo) return demoApply();
+    if (!controlChar) return;
+    try { await controlChar.writeValueWithResponse(bytes); }
+    catch (err) { ui.foot.textContent = `指令沒有送出（${err.message}），請再試一次。`; }
+  }
+
+  // ---------- 示範模式（網址加上 ?demo，不需要硬體） ----------
+  let demoTimer = null, demoClock = 0, demoFanOn = false;
+  function demoAuto(t) {
+    const { t0, t1, t2, dmin } = state.cfg;
+    if (!demoFanOn && t >= t1) demoFanOn = true;
+    if (demoFanOn && t < t0) demoFanOn = false;
+    if (!demoFanOn) return 0;
+    if (t >= t2) return 100;
+    return Math.max(dmin, Math.round(dmin + (t - t1) / (t2 - t1) * (100 - dmin)));
+  }
+  function demoApply() {
+    const m = state.manual > 0 && state.manual < state.cfg.dmin ? state.cfg.dmin : state.manual;
+    state.pct = state.auto ? demoAuto(state.temp) : m;
+    render();
+  }
+  function startDemo() {
+    buildChart();
+    state.temp = 29.4;
+    setLink('connected');
+    demoApply();
+    demoTimer = setInterval(() => {
+      demoClock += 1;
+      state.temp = 30 + 4.5 * Math.sin(demoClock / 9) + (Math.random() - .5) * .3;
+      demoApply();
+    }, 1000);
+    ui.foot.textContent = '示範模式：溫度為模擬資料。';
+  }
+  function stopDemo() { clearInterval(demoTimer); ui.foot.textContent = ''; }
+
+  // ---------- 事件 ----------
+  ui.connectBtn.addEventListener('click', connect);
+  ui.disconnectBtn.addEventListener('click', disconnect);
+  ui.modeAuto.addEventListener('click', () => { state.auto = true; render(); sendControl(); });
+  ui.modeManual.addEventListener('click', () => { state.auto = false; render(); sendControl(); });
+
+  let sendTimer = null;
+  ui.slider.addEventListener('pointerdown', () => { dragging = true; });
+  ui.slider.addEventListener('input', () => {
+    state.manual = Number(ui.slider.value);
+    ui.sliderOut.textContent = state.manual + '%';
+    clearTimeout(sendTimer);
+    sendTimer = setTimeout(sendControl, 120);  // 拖曳時節流，避免塞爆藍牙
+  });
+  ui.slider.addEventListener('change', () => {
+    dragging = false;
+    clearTimeout(sendTimer);
+    sendControl();
+    render();
+  });
+
+  if (!demo && !navigator.bluetooth) {
+    ui.unsupported.hidden = false;
+    ui.connectBtn.disabled = true;
+    ui.connectText.hidden = true;
+  }
+  if (demo) ui.connectText.textContent = '示範模式：點下方按鈕，用模擬資料預覽介面。';
+
+  buildChart();
+  render();
+  if (demo) ui.connectBtn.disabled = false;
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>

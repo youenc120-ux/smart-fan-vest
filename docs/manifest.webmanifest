@@ -1,0 +1,12 @@
+{
+  "name": "風扇背心控制",
+  "short_name": "風扇背心",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3efe7",
+  "theme_color": "#1d2430",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
