@@ -42,8 +42,19 @@
   <path d="M240 150 H300" class="w v12"/>
   <rect x="300" y="138" width="60" height="24" class="part"/>
   <text x="330" y="128" text-anchor="middle" class="s14">F1 保險絲 3A</text>
-  <path d="M360 150 H1120" class="w v12"/>
-  <text x="600" y="140" text-anchor="middle" class="s14" fill="#d32f2f">+12V</text>
+  <path d="M360 150 H480 M600 150 H1120" class="w v12"/>
+  <text x="700" y="140" text-anchor="middle" class="s14" fill="#d32f2f">+12V</text>
+
+  <!-- U1 INA219 電流／電壓感測（串在 +12V 主線上） -->
+  <rect x="480" y="125" width="120" height="50" rx="6" fill="#fff3e0" stroke="#333" stroke-width="2"/>
+  <text x="540" y="148" text-anchor="middle" class="s14 b">U1 INA219</text>
+  <text x="540" y="166" text-anchor="middle" class="s13">VIN+ → VIN−</text>
+  <text x="540" y="115" text-anchor="middle" class="s13">電流／電壓感測</text>
+  <path d="M520 175 V380" class="w sig"/>
+  <path d="M560 175 V380" class="w sig" stroke-dasharray="7 5"/>
+  <text x="514" y="235" text-anchor="end" class="s13">SDA</text>
+  <text x="566" y="235" class="s13">SCL</text>
+  <text x="510" y="200" text-anchor="end" class="s13">VCC 接 3V3、GND 共地</text>
 
   <!-- 電池 DC− 接地 -->
   <path d="M240 190 H270 V215" class="w gnd"/>
@@ -120,6 +131,10 @@
   <!-- ESP32 -->
   <rect x="360" y="380" width="200" height="250" rx="10" fill="#e3f2fd" class="box"/>
   <text x="460" y="402" text-anchor="middle" class="s13">USB</text>
+  <text x="520" y="420" text-anchor="middle" class="s13">21</text>
+  <text x="555" y="420" text-anchor="end" class="s13">22</text>
+  <circle cx="520" cy="380" r="5" class="pin"/>
+  <circle cx="560" cy="380" r="5" class="pin"/>
   <text x="460" y="445" text-anchor="middle" font-size="24" class="b">ESP32</text>
   <text x="460" y="470" text-anchor="middle" class="s14">開發板</text>
   <text x="550" y="455" text-anchor="end" class="s14">GPIO25</text>
@@ -167,6 +182,6 @@
   <rect x="40" y="695" width="1120" height="130" rx="10" fill="#fffaf0" stroke="#c9a227" stroke-width="2" stroke-dasharray="8 5"/>
   <text x="60" y="725" class="s16 b">接線重點</text>
   <text x="60" y="752" class="s14">① 電池調速固定在最高段，轉速改由 ESP32 的 PWM 控制。　② 所有 GND 必須共地：ESP32 的 GND 要接到 Q1 的 S 極（電池 DC−）。</text>
-  <text x="60" y="777" class="s14">③ D1 有白環的那端（陰極）接 +12V。　④ 腳位與程式 fan_vest.ino 一致：GPIO25 = PWM、GPIO4 = 溫度。</text>
+  <text x="60" y="777" class="s14">③ D1 有白環的那端（陰極）接 +12V。　④ 腳位：GPIO25 = PWM、GPIO4 = 溫度、GPIO21/22 = INA219 SDA/SCL。</text>
   <text x="60" y="802" class="s14">⑤ 用 D4184 模組時：VIN+/VIN− 接電池、OUT+/OUT− 接風扇、PWM/GND 接 ESP32；模組內已含 Q1、R1、R2，D1 仍需外加。</text>
 </svg>
