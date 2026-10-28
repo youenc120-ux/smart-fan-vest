@@ -1,6 +1,7 @@
 // 藍牙連線、示範模式與操作事件。畫面繪製在 ui.js。
 (() => {
   const { ui, state, FLAG, render, buildCurve, pushHistory, fillSettingsForm, sliderFill } = window.FV;
+  const { t } = window.I18N;
   const UUID = n => `7a1e000${n}-5c2b-4f0a-9d3e-6b8f2a4c9e10`;
   const SERVICE = UUID(1), STATUS = UUID(2), CONTROL = UUID(3), CONFIG = UUID(4), SETTINGS = UUID(5);
   const INVALID = -32768;
@@ -88,8 +89,8 @@
       if (err.name === 'NotFoundError') return;  // 使用者取消選擇
       const pairing = /auth|encrypt|insufficient|security/i.test(err.message);
       showError(pairing
-        ? '配對失敗，請確認配對碼是否正確（預設 123456）。若之前配對過舊版韌體，請到手機藍牙設定把「FanVest」取消配對後再試。'
-        : `連不上背心（${err.message}）。請確認背心電源已開啟、距離在幾公尺內，再試一次。`);
+        ? t('errPairing')
+        : t('errConnect', { msg: err.message }));
     }
   }
 
@@ -102,7 +103,7 @@
       try { await openGatt(); return; } catch (_) { /* 再試一次 */ }
     }
     setLink('idle');
-    showError('和背心的連線中斷了。請確認背心電源與距離，再點「連線裝置」。');
+    showError(t('errLost'));
   }
 
   function disconnect() {
@@ -116,12 +117,12 @@
     if (demo) return true;
     if (!char) return false;
     try { await char.writeValueWithResponse(bytes); return true; }
-    catch (err) { ui.foot.textContent = `${what}沒有送出（${err.message}），請再試一次。`; return false; }
+    catch (err) { ui.foot.textContent = t('errWrite', { what: t(what), msg: err.message }); return false; }
   }
 
   function sendControl() {
     if (demo) demoApply();
-    return write(controlChar, new Uint8Array([state.auto ? 1 : 0, state.manualUpper, state.manualLower]), '指令');
+    return write(controlChar, new Uint8Array([state.auto ? 1 : 0, state.manualUpper, state.manualLower]), 'whatCommand');
   }
 
   // ---------- 螢幕保持亮著（避免手機休眠時藍牙斷線） ----------
@@ -157,11 +158,11 @@
     const s = { t0: n(ui.setT0), t1: n(ui.setT1), t2: n(ui.setT2), heat: n(ui.setHeat),
       boost: Number(ui.setBoost.value), buzzer: ui.setBuzzer.checked, useFeels: ui.setFeels.checked };
     let err = '';
-    if ([s.t0, s.t1, s.t2, s.heat].some(Number.isNaN)) err = '每個溫度欄位都要填數字。';
-    else if (!(s.t0 < s.t1 && s.t1 < s.t2)) err = '溫度要符合：停止溫度 < 啟動溫度 < 全速溫度。';
-    else if (s.t0 < 15 || s.t2 > 45) err = '溫度範圍要在 15–45°C 之間。';
-    else if (s.t1 - s.t0 < 1) err = '停止溫度至少要比啟動溫度低 1°C（DHT11 建議 2°C），風扇才不會忽開忽關。';
-    else if (s.heat < 30 || s.heat > 55) err = '中暑警示要在 30–55°C 之間。';
+    if ([s.t0, s.t1, s.t2, s.heat].some(Number.isNaN)) err = t('errNumber');
+    else if (!(s.t0 < s.t1 && s.t1 < s.t2)) err = t('errOrder');
+    else if (s.t0 < 15 || s.t2 > 45) err = t('errRange');
+    else if (s.t1 - s.t0 < 1) err = t('errGap');
+    else if (s.heat < 30 || s.heat > 55) err = t('errHeat');
     ui.settingsError.hidden = !err;
     ui.settingsErrorText.textContent = err;
     if (err) return;
@@ -175,11 +176,11 @@
     b.setUint8(9, s.buzzer ? 1 : 0);
     b.setUint8(10, s.useFeels ? 1 : 0);
     ui.saveBtn.disabled = true;
-    const ok = await write(settingsChar, b.buffer, '設定');
+    const ok = await write(settingsChar, b.buffer, 'whatSettings');
     if (ok && !demo) parseSettings(await settingsChar.readValue());  // 讀回背心實際採用的設定
     if (ok && demo) { state.set = s; buildCurve(); }
     ui.saveBtn.disabled = state.link !== 'connected';
-    ui.settingsNote.textContent = ok ? '已儲存到背心，重新開機也不會消失。' : '儲存失敗，請再試一次。';
+    ui.settingsNote.textContent = t(ok ? 'settingsSaved' : 'settingsFailed');
     render();
   }
 
@@ -237,7 +238,7 @@
       state.uptime = demoClock;
       demoApply();
     }, 1000);
-    ui.foot.textContent = '示範模式：資料為模擬，時間加速播放。';
+    ui.foot.textContent = t('demoFoot');
   }
   function stopDemo() { clearInterval(demoTimer); ui.foot.textContent = ''; }
 
@@ -277,7 +278,18 @@
     ui.connectBtn.disabled = true;
     ui.connectText.hidden = true;
   }
-  if (demo) ui.connectText.textContent = '示範模式：點下面的按鈕，用模擬資料預覽介面。';
+  // 語言：套用靜態文字，示範模式改用示範說明，切換語言時重畫
+  const applyLang = () => {
+    window.I18N.applyStatic();
+    if (demo) ui.connectText.textContent = t('connectTextDemo');
+    if (demo && state.link === 'connected') ui.foot.textContent = t('demoFoot');
+    buildCurve();
+    render();
+  };
+  ui.connectText.dataset.i18n = 'connectText';
+  ui.langBtn.addEventListener('click', () => window.I18N.setLang(window.I18N.lang === 'zh' ? 'en' : 'zh'));
+  window.I18N.onChange(applyLang);
+  applyLang();
 
   buildCurve();
   fillSettingsForm();

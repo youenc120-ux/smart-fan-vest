@@ -1,7 +1,8 @@
 // 畫面：狀態、儀表、電源、圖表的繪製。藍牙與事件在 app.js。
 window.FV = (() => {
   const $ = id => document.getElementById(id);
-  const ids = ['link', 'linkText', 'connectPanel', 'connectText', 'connectBtn', 'connectBtnText', 'unsupported',
+  const t = (key, vars) => window.I18N.t(key, vars);
+  const ids = ['langBtn', 'link', 'linkText', 'connectPanel', 'connectText', 'connectBtn', 'connectBtnText', 'unsupported',
     'connectError', 'connectErrorText', 'heatAlert', 'heatAlertTitle', 'heatAlertText', 'muteBtn', 'arc', 'temp',
     'level', 'pctUpper', 'pctLower', 'fanIcon', 'hum', 'feels', 'sensorError', 'sensorErrorText', 'hint',
     'modeAuto', 'modeManual', 'sliderUpper', 'sliderLower', 'outUpper', 'outLower', 'sliderNote',
@@ -31,14 +32,15 @@ window.FV = (() => {
   const fmt1 = v => (Math.round(v * 10) / 10).toFixed(1);
 
   // 溫度分級：顏色＋文字，不只靠顏色辨識
-  function level(t) {
+  function level(temp) {
     const { t1, t2 } = state.set;
-    if (t === null) return { color: 'var(--idle)', text: '' };
-    if (t < t1) return { color: 'var(--cool)', text: '涼爽' };
-    if (t < (t1 + t2) / 2) return { color: 'var(--warm)', text: '溫暖' };
-    if (t < t2) return { color: 'var(--hot)', text: '炎熱' };
-    return { color: 'var(--peak)', text: '高溫・全速散熱' };
+    if (temp === null) return { color: 'var(--idle)', text: '' };
+    if (temp < t1) return { color: 'var(--cool)', text: t('levelCool') };
+    if (temp < (t1 + t2) / 2) return { color: 'var(--warm)', text: t('levelWarm') };
+    if (temp < t2) return { color: 'var(--hot)', text: t('levelHot') };
+    return { color: 'var(--peak)', text: t('levelPeak') };
   }
+  const basisText = () => t(state.set.useFeels ? 'basisFeels' : 'basisTemp');
 
   // ---------- SVG 小工具 ----------
   const NS = 'http://www.w3.org/2000/svg';
@@ -63,8 +65,8 @@ window.FV = (() => {
       el('line', { class: 'axis', x1: C.x0, x2: C.x1, y1: sy(p), y2: sy(p) }, svg);
       el('text', { class: 'tick', x: C.x0 - 6, y: sy(p) + 4, 'text-anchor': 'end' }, svg).textContent = p + '%';
     }
-    for (const t of [20, 25, 30, 35, 40, 45]) {
-      el('text', { class: 'tick', x: sx(t), y: C.y0 + 18, 'text-anchor': 'middle' }, svg).textContent = t + '°';
+    for (const deg of [20, 25, 30, 35, 40, 45]) {
+      el('text', { class: 'tick', x: sx(deg), y: C.y0 + 18, 'text-anchor': 'middle' }, svg).textContent = deg + '°';
     }
     const path = el('path', { class: 'path', d: `M${sx(C.tmin)} ${sy(0)} H${sx(t1)} V${sy(dmin)} L${sx(t2)} ${sy(100)} H${sx(C.tmax)}` }, svg);
     const manualLine = el('line', { class: 'manual-line', x1: C.x0, x2: C.x1, y1: sy(50), y2: sy(50), opacity: 0 }, svg);
@@ -76,23 +78,22 @@ window.FV = (() => {
   }
 
   function drawCurve() {
-    const { path, manualLine, marker, guide } = curve, on = live(), t = ctrlTemp();
+    const { path, manualLine, marker, guide } = curve, on = live(), temp = ctrlTemp();
     path.classList.toggle('dim', on && !state.auto);
     manualLine.setAttribute('opacity', on && !state.auto ? 1 : 0);
     manualLine.setAttribute('y1', sy(state.manualUpper));
     manualLine.setAttribute('y2', sy(state.manualUpper));
-    if (on && t !== null && state.upper !== null) {
-      const x = sx(t), y = sy(state.upper);
+    if (on && temp !== null && state.upper !== null) {
+      const x = sx(temp), y = sy(state.upper);
       marker.setAttribute('opacity', 1);
       marker.style.transform = `translate(${x}px, ${y}px)`;
       guide.setAttribute('y2', C.y0 - y);
     } else {
       marker.setAttribute('opacity', 0);
     }
-    const basis = state.set.useFeels ? '體感溫度' : '溫度';
     ui.curveSub.textContent = state.auto || !on
-      ? `橫軸是${basis}，圓點是上方目前的位置；下方會再加強 ${state.set.boost}%。藍色區是遲滯區：風扇轉動後要降到 ${state.set.t0}°C 以下才停。`
-      : '手動模式中，虛線是你設定的上方風速；曲線僅供參考。';
+      ? t('curveAuto', { basis: basisText(), basisName: t(state.set.useFeels ? 'axisFeels' : 'axisTemp'), boost: state.set.boost, t0: state.set.t0 })
+      : t('curveManual');
   }
 
   // ---------- 最近 10 分鐘 ----------
@@ -109,7 +110,7 @@ window.FV = (() => {
     svg.textContent = '';
     const vals = h.flatMap(p => [p.temp, p.feels]).filter(v => v !== null);
     const lo = Math.floor((vals.length ? Math.min(...vals) : 24) - 1), hi = Math.ceil((vals.length ? Math.max(...vals) : 36) + 1);
-    const tx = t => H.x0 + (1 - (now - t) / H.span) * (H.x1 - H.x0);
+    const tx = time => H.x0 + (1 - (now - time) / H.span) * (H.x1 - H.x0);
     const ty = v => H.y0 - (v - lo) / (hi - lo) * (H.y0 - H.y1);
     const py = p => H.y0 - p / 100 * (H.y0 - H.y1);
     for (const v of [lo, (lo + hi) / 2, hi]) {
@@ -118,7 +119,7 @@ window.FV = (() => {
     }
     for (const p of [0, 100]) el('text', { class: 'tick', x: H.x1 + 6, y: py(p) + 4 }, svg).textContent = p + '%';
     for (const m of [10, 5, 0]) {
-      el('text', { class: 'tick', x: tx(now - m * 60000), y: H.y0 + 18, 'text-anchor': 'middle' }, svg).textContent = m ? `-${m} 分` : '現在';
+      el('text', { class: 'tick', x: tx(now - m * 60000), y: H.y0 + 18, 'text-anchor': 'middle' }, svg).textContent = m ? t('minAgo', { m }) : t('now');
     }
     if (state.set.heat > lo && state.set.heat < hi) {
       el('line', { class: 'h-alert', x1: H.x0, x2: H.x1, y1: ty(state.set.heat), y2: ty(state.set.heat) }, svg);
@@ -132,20 +133,20 @@ window.FV = (() => {
   }
 
   // ---------- 主畫面 ----------
-  const LINK_TEXT = { idle: '未連線', connecting: '連線中…', connected: '已連線', lost: '重新連線中…' };
+  const LINK_KEY = { idle: 'linkIdle', connecting: 'linkConnecting', connected: 'linkConnected', lost: 'linkLost' };
   const sliderFill = s => s.style.setProperty('--fill', (s.value / s.max * 100) + '%');
 
   function render() {
     const on = live(), s = state, f = s.flags;
     ui.link.dataset.state = s.link;
-    ui.linkText.textContent = LINK_TEXT[s.link];
+    ui.linkText.textContent = t(LINK_KEY[s.link]);
     ui.connectPanel.hidden = on;
     ui.disconnectBtn.hidden = !on;
     ui.connectBtn.disabled = s.link === 'connecting' || s.link === 'lost';
-    ui.connectBtnText.textContent = s.link === 'connecting' ? '連線中…' : s.link === 'lost' ? '重新連線中…' : '連線裝置';
+    ui.connectBtnText.textContent = t(s.link === 'connecting' || s.link === 'lost' ? LINK_KEY[s.link] : 'connectBtn');
 
     // 儀表：圓環 = 上下較快的一區，顏色 = 控制溫度等級
-    const t = on ? ctrlTemp() : null, lv = level(t);
+    const lv = level(on ? ctrlTemp() : null);
     const pct = on ? Math.max(s.upper || 0, s.lower || 0) : 0;
     document.documentElement.style.setProperty('--tc', lv.color);
     ui.arc.setAttribute('stroke-dasharray', `${pct} 100`);
@@ -159,16 +160,16 @@ window.FV = (() => {
     ui.fanIcon.style.animationDuration = pct > 0 ? (1.8 - pct / 100 * 1.5).toFixed(2) + 's' : '1s';
     ui.fanIcon.style.animationPlayState = pct > 0 ? 'running' : 'paused';
     ui.sensorError.hidden = !(on && s.temp === null);
-    ui.sensorErrorText.textContent = `溫濕度感測器沒有回應，風扇暫以 ${s.cfg.fail}% 安全轉速運轉。請檢查 DHT 接線。`;
-    ui.hint.textContent = !on ? '連線後會顯示即時溫度與風速。'
-      : s.auto ? `自動模式：${s.set.useFeels ? '體感溫度' : '溫度'} ${s.set.t1}°C 以上開始送風，${s.set.t2}°C 全速。`
-      : '手動模式：風速由滑桿決定，不受溫度影響。';
+    ui.sensorErrorText.textContent = t('sensorError', { fail: s.cfg.fail });
+    ui.hint.textContent = !on ? t('hintIdle')
+      : s.auto ? t('hintAuto', { basis: basisText(), t1: s.set.t1, t2: s.set.t2 })
+      : t('hintManual');
 
     // 中暑警示
     const heat = on && (f & FLAG.HEAT);
     ui.heatAlert.hidden = !heat;
-    ui.heatAlertTitle.textContent = `中暑風險：體感溫度 ${s.feels !== null ? fmt1(s.feels) : '—'}°C`;
-    ui.heatAlertText.textContent = '請盡快到陰涼處休息、補充水分；若頭暈、噁心或停止流汗，請立即求助。';
+    ui.heatAlertTitle.textContent = t('heatTitle', { feels: s.feels !== null ? fmt1(s.feels) : '—' });
+    ui.heatAlertText.textContent = t('heatText');
     ui.muteBtn.hidden = !!(f & FLAG.MUTED);
 
     // 控制
@@ -180,9 +181,9 @@ window.FV = (() => {
       if (!s.dragging) { slider.value = v; out.textContent = v + '%'; }
       sliderFill(slider);
     }
-    ui.sliderNote.textContent = !on ? '連線後可以使用。'
-      : s.auto ? `自動模式時，下方比上方多吹 ${s.set.boost}%，可在「設定」調整。`
-      : `低於 ${s.cfg.dmin}% 時風扇可能轉不動，會自動提高到 ${s.cfg.dmin}%；拉到 0 為停止。`;
+    ui.sliderNote.textContent = !on ? t('sliderIdle')
+      : s.auto ? t('sliderAuto', { boost: s.set.boost })
+      : t('sliderManual', { dmin: s.cfg.dmin });
 
     renderPower(on);
     drawCurve();
@@ -202,15 +203,16 @@ window.FV = (() => {
     ui.battFill.style.width = (batt || 0) + '%';
     ui.battFill.style.backgroundColor = batt !== null && batt < 20 ? 'var(--peak)' : batt !== null && batt < 40 ? 'var(--warm)' : 'var(--ok)';
     const h = Math.floor(s.uptime / 60), m = s.uptime % 60;
-    ui.usage.textContent = on ? `本次開機 ${h ? h + ' 小時 ' : ''}${m} 分鐘，耗電 ${s.wh.toFixed(2)} Wh` : '—';
+    const time = (h ? t('hours', { h }) : '') + t('minutes', { m });
+    ui.usage.textContent = on ? t('usage', { time, wh: s.wh.toFixed(2) }) : '—';
     ui.powerGrid.style.opacity = missing ? .4 : 1;
     ui.powerNote.hidden = !missing;
     ui.overcurrent.hidden = !(on && (f & FLAG.OVERCURRENT));
-    ui.overcurrentText.textContent = `電流超過 ${(s.cfg.ocMa / 1000).toFixed(1)}A，已自動停止風扇保護電路。請檢查風扇與接線，排除後切換一次模式、調整風速，或長按背心上的按鈕即可恢復。`;
+    ui.overcurrentText.textContent = t('overcurrent', { amps: (s.cfg.ocMa / 1000).toFixed(1) });
     ui.fanLow.hidden = !(on && (f & FLAG.FAN_LOW));
-    ui.fanLowText.textContent = `風扇在轉但電流只有 ${has ? Math.round(s.ma) : '—'} mA，可能有風扇沒接好或斷線。`;
+    ui.fanLowText.textContent = t('fanLow', { ma: has ? Math.round(s.ma) : '—' });
     ui.lowBatt.hidden = !(on && (f & FLAG.LOW_BATT));
-    ui.lowBattText.textContent = `電量偏低，已限制最高風速為 ${s.cfg.lowCap}% 以延長使用時間，請盡快充電。`;
+    ui.lowBattText.textContent = t('lowBatt', { cap: s.cfg.lowCap });
   }
 
   function fillSettingsForm() {

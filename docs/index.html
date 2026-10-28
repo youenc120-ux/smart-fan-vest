@@ -18,18 +18,19 @@
   <div class="bar-inner">
     <h1 class="brand">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c4 0 6 3.2 5 6.4-.7 2.3-3 3.4-5 3.6M29 16c0 4-3.2 6-6.4 5-2.3-.7-3.4-3-3.6-5M16 29c-4 0-6-3.2-5-6.4.7-2.3 3-3.4 5-3.6M3 16c0-4 3.2-6 6.4-5 2.3.7 3.4 3 3.6 5" fill="none" stroke="#fb923c" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="#f8fafc"/></svg>
-      風扇背心
+      <span data-i18n="brand">風扇背心</span>
     </h1>
+    <button class="lang" id="langBtn" type="button" data-i18n="langBtn" data-i18n-aria="langLabel">EN</button>
     <span class="link" id="link" data-state="idle" role="status" aria-live="polite"><span class="link-dot"></span><span id="linkText">未連線</span></span>
   </div>
 </header>
 
 <main>
   <section class="panel connect" id="connectPanel" aria-labelledby="connectTitle">
-    <h2 id="connectTitle">連線到背心</h2>
+    <h2 id="connectTitle" data-i18n="connectTitle">連線到背心</h2>
     <p id="connectText">打開背心電源與手機藍牙，再點下面的按鈕，從清單選擇「FanVest」。第一次連線時手機會要求輸入配對碼（預設 123456）。</p>
     <div class="notice err" id="unsupported" hidden>
-      <p>這個瀏覽器不支援藍牙網頁連線。Android 請用 Chrome 開啟本頁；iPhone 請改用 Bluefy 瀏覽器。</p>
+      <p data-i18n="unsupported">這個瀏覽器不支援藍牙網頁連線。Android 請用 Chrome 開啟本頁；iPhone 請改用 Bluefy 瀏覽器。</p>
     </div>
     <div class="notice err" id="connectError" hidden><p id="connectErrorText"></p></div>
     <button class="primary" id="connectBtn" type="button">
@@ -44,101 +45,102 @@
       <p class="alert-title" id="heatAlertTitle">中暑風險</p>
       <p id="heatAlertText">請到陰涼處休息、補充水分。</p>
     </div>
-    <button type="button" id="muteBtn">我知道了</button>
+    <button type="button" id="muteBtn" data-i18n="mute">我知道了</button>
   </section>
 
-  <section class="panel gauge-panel" aria-label="即時讀數">
+  <section class="panel gauge-panel" data-i18n-aria="readings" aria-label="即時讀數">
     <div class="gauge">
       <svg viewBox="0 0 240 240" aria-hidden="true">
         <path class="track" d="M49.29 190.71 A100 100 0 1 1 190.71 190.71"/>
         <path class="arc" id="arc" d="M49.29 190.71 A100 100 0 1 1 190.71 190.71" pathLength="100" stroke-dasharray="0 100"/>
       </svg>
       <div class="gauge-center">
-        <span class="g-label">背心內溫度</span>
+        <span class="g-label" data-i18n="insideTemp">背心內溫度</span>
         <span class="g-temp"><span id="temp">—</span><span class="unit">°C</span></span>
         <span class="g-level" id="level"></span>
       </div>
       <div class="g-fan">
         <svg class="fan-icon" id="fanIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c3 0 4.5 2.4 3.8 4.8-.5 1.7-2.2 2.6-3.8 2.7M21.5 12c0 3-2.4 4.5-4.8 3.8-1.7-.5-2.6-2.2-2.7-3.8M12 21.5c-3 0-4.5-2.4-3.8-4.8.5-1.7 2.2-2.6 3.8-2.7M2.5 12c0-3 2.4-4.5 4.8-3.8 1.7.5 2.6 2.2 2.7 3.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>
-        <span>上</span><strong><span id="pctUpper">—</span>%</strong>
-        <span>下</span><strong><span id="pctLower">—</span>%</strong>
+        <span data-i18n="upperShort">上</span><strong><span id="pctUpper">—</span>%</strong>
+        <span data-i18n="lowerShort">下</span><strong><span id="pctLower">—</span>%</strong>
       </div>
     </div>
     <div class="stats">
-      <div><p class="p-label">濕度</p><p class="p-value"><span id="hum">—</span><span class="p-unit">%</span></p></div>
-      <div><p class="p-label">體感溫度</p><p class="p-value"><span id="feels">—</span><span class="p-unit">°C</span></p></div>
+      <div><p class="p-label" data-i18n="humidity">濕度</p><p class="p-value"><span id="hum">—</span><span class="p-unit">%</span></p></div>
+      <div><p class="p-label" data-i18n="feelsLike">體感溫度</p><p class="p-value"><span id="feels">—</span><span class="p-unit">°C</span></p></div>
     </div>
     <div class="notice warn" id="sensorError" hidden><p id="sensorErrorText"></p></div>
     <p class="hint" id="hint">連線後會顯示即時溫度與風速。</p>
   </section>
 
   <section class="panel control" aria-labelledby="controlTitle">
-    <h2 id="controlTitle">控制模式</h2>
-    <div class="segmented" role="group" aria-label="控制模式">
-      <button type="button" id="modeAuto" aria-pressed="true" disabled>自動</button>
-      <button type="button" id="modeManual" aria-pressed="false" disabled>手動</button>
+    <h2 id="controlTitle" data-i18n="controlTitle">控制模式</h2>
+    <div class="segmented" role="group" data-i18n-aria="controlTitle" aria-label="控制模式">
+      <button type="button" id="modeAuto" aria-pressed="true" disabled data-i18n="modeAuto">自動</button>
+      <button type="button" id="modeManual" aria-pressed="false" disabled data-i18n="modeManual">手動</button>
     </div>
-    <div class="slider-head"><label for="sliderUpper">上方風速</label><output id="outUpper" for="sliderUpper">50%</output></div>
+    <div class="slider-head"><label for="sliderUpper" data-i18n="upperSpeed">上方風速</label><output id="outUpper" for="sliderUpper">50%</output></div>
     <input type="range" id="sliderUpper" min="0" max="100" step="5" value="50" disabled>
-    <div class="slider-head"><label for="sliderLower">下方風速</label><output id="outLower" for="sliderLower">50%</output></div>
+    <div class="slider-head"><label for="sliderLower" data-i18n="lowerSpeed">下方風速</label><output id="outLower" for="sliderLower">50%</output></div>
     <input type="range" id="sliderLower" min="0" max="100" step="5" value="50" disabled>
     <p class="slider-note" id="sliderNote">切換到手動模式後可以拖曳調整。</p>
   </section>
 
   <section class="panel power" aria-labelledby="powerTitle">
-    <h2 id="powerTitle">電源</h2>
+    <h2 id="powerTitle" data-i18n="powerTitle">電源</h2>
     <div class="battery" id="battery">
-      <div class="batt-head"><span class="p-label">電池（估算）</span><strong id="battPct">—</strong></div>
+      <div class="batt-head"><span class="p-label" data-i18n="battery">電池（估算）</span><strong id="battPct">—</strong></div>
       <div class="batt-bar"><div id="battFill"></div></div>
     </div>
     <div class="power-grid" id="powerGrid">
-      <div><p class="p-label">電流</p><p class="p-value"><span id="amps">—</span><span class="p-unit">A</span></p></div>
-      <div><p class="p-label">電壓</p><p class="p-value"><span id="volts">—</span><span class="p-unit">V</span></p></div>
-      <div><p class="p-label">功率</p><p class="p-value"><span id="watts">—</span><span class="p-unit">W</span></p></div>
+      <div><p class="p-label" data-i18n="current">電流</p><p class="p-value"><span id="amps">—</span><span class="p-unit">A</span></p></div>
+      <div><p class="p-label" data-i18n="voltage">電壓</p><p class="p-value"><span id="volts">—</span><span class="p-unit">V</span></p></div>
+      <div><p class="p-label" data-i18n="power">功率</p><p class="p-value"><span id="watts">—</span><span class="p-unit">W</span></p></div>
     </div>
     <p class="slider-note" id="usage">—</p>
     <div class="notice err" id="overcurrent" hidden><p id="overcurrentText"></p></div>
     <div class="notice warn" id="fanLow" hidden><p id="fanLowText"></p></div>
     <div class="notice warn" id="lowBatt" hidden><p id="lowBattText"></p></div>
-    <p class="slider-note" id="powerNote" hidden>沒有偵測到電流感測器（INA219），其他功能照常運作。</p>
+    <p class="slider-note" id="powerNote" hidden data-i18n="powerMissing">沒有偵測到電流感測器（INA219），其他功能照常運作。</p>
   </section>
 
   <section class="panel history" aria-labelledby="historyTitle">
-    <h2 id="historyTitle">最近 10 分鐘</h2>
+    <h2 id="historyTitle" data-i18n="historyTitle">最近 10 分鐘</h2>
     <div class="legend">
-      <span><i class="lg-temp"></i>溫度</span><span><i class="lg-feels"></i>體感</span><span><i class="lg-fan"></i>風速（右軸）</span>
+      <span><i class="lg-temp"></i><span data-i18n="legendTemp">溫度</span></span><span><i class="lg-feels"></i><span data-i18n="legendFeels">體感</span></span><span><i class="lg-fan"></i><span data-i18n="legendFan">風速（右軸）</span></span>
     </div>
-    <svg id="historyChart" viewBox="0 0 340 170" role="img" aria-label="最近 10 分鐘溫度與風速"></svg>
-    <p class="slider-note" id="historyNote">連線後開始記錄，網頁關閉後會清除。</p>
+    <svg id="historyChart" viewBox="0 0 340 170" role="img" data-i18n-aria="historyChart" aria-label="最近 10 分鐘溫度與風速"></svg>
+    <p class="slider-note" id="historyNote" data-i18n="historyNote">連線後開始記錄，網頁關閉後會清除。</p>
   </section>
 
   <section class="panel curve" aria-labelledby="curveTitle">
-    <h2 id="curveTitle">溫度與風速曲線</h2>
+    <h2 id="curveTitle" data-i18n="curveTitle">溫度與風速曲線</h2>
     <p class="sub" id="curveSub"></p>
-    <svg id="chart" viewBox="0 0 340 190" role="img" aria-label="溫度對應風速曲線"></svg>
+    <svg id="chart" viewBox="0 0 340 190" role="img" data-i18n-aria="curveChart" aria-label="溫度對應風速曲線"></svg>
   </section>
 
   <details class="panel settings" id="settings">
-    <summary><h2>設定</h2><span class="slider-note">溫度門檻、警示、蜂鳴器</span></summary>
+    <summary><h2 data-i18n="settingsTitle">設定</h2><span class="slider-note" data-i18n="settingsSub">溫度門檻、警示、蜂鳴器</span></summary>
     <form id="settingsForm" novalidate>
-      <div class="field"><label for="setT1">啟動溫度</label><span><input type="number" id="setT1" step="0.5" min="16" max="44" inputmode="decimal"> °C</span></div>
-      <div class="field"><label for="setT0">停止溫度</label><span><input type="number" id="setT0" step="0.5" min="15" max="43" inputmode="decimal"> °C</span></div>
-      <div class="field"><label for="setT2">全速溫度</label><span><input type="number" id="setT2" step="0.5" min="17" max="45" inputmode="decimal"> °C</span></div>
-      <div class="field"><label for="setHeat">中暑警示（體感）</label><span><input type="number" id="setHeat" step="0.5" min="30" max="55" inputmode="decimal"> °C</span></div>
-      <div class="slider-head"><label for="setBoost">自動模式下方加強</label><output id="outBoost" for="setBoost">10%</output></div>
+      <div class="field"><label for="setT1" data-i18n="setT1">啟動溫度</label><span><input type="number" id="setT1" step="0.5" min="16" max="44" inputmode="decimal"> °C</span></div>
+      <div class="field"><label for="setT0" data-i18n="setT0">停止溫度</label><span><input type="number" id="setT0" step="0.5" min="15" max="43" inputmode="decimal"> °C</span></div>
+      <div class="field"><label for="setT2" data-i18n="setT2">全速溫度</label><span><input type="number" id="setT2" step="0.5" min="17" max="45" inputmode="decimal"> °C</span></div>
+      <div class="field"><label for="setHeat" data-i18n="setHeat">中暑警示（體感）</label><span><input type="number" id="setHeat" step="0.5" min="30" max="55" inputmode="decimal"> °C</span></div>
+      <div class="slider-head"><label for="setBoost" data-i18n="setBoost">自動模式下方加強</label><output id="outBoost" for="setBoost">10%</output></div>
       <input type="range" id="setBoost" min="0" max="50" step="5" value="10">
-      <label class="toggle"><input type="checkbox" id="setFeels"><span>依體感溫度控制（考慮濕度，悶熱時吹更強）</span></label>
-      <label class="toggle"><input type="checkbox" id="setBuzzer"><span>蜂鳴器提醒</span></label>
+      <label class="toggle"><input type="checkbox" id="setFeels"><span data-i18n="setFeels">依體感溫度控制（考慮濕度，悶熱時吹更強）</span></label>
+      <label class="toggle"><input type="checkbox" id="setBuzzer"><span data-i18n="setBuzzer">蜂鳴器提醒</span></label>
       <div class="notice err" id="settingsError" hidden><p id="settingsErrorText"></p></div>
-      <button class="primary" type="submit" id="saveBtn" disabled>儲存到背心</button>
-      <p class="slider-note" id="settingsNote">設定會存在背心裡，重新開機也不會消失。</p>
+      <button class="primary" type="submit" id="saveBtn" disabled data-i18n="save">儲存到背心</button>
+      <p class="slider-note" id="settingsNote" data-i18n="settingsNote">設定會存在背心裡，重新開機也不會消失。</p>
     </form>
   </details>
 
-  <button class="ghost" id="disconnectBtn" type="button" hidden>中斷連線</button>
+  <button class="ghost" id="disconnectBtn" type="button" hidden data-i18n="disconnect">中斷連線</button>
   <p class="foot" id="foot"></p>
 </main>
 
+<script src="i18n.js"></script>
 <script src="ui.js"></script>
 <script src="app.js"></script>
 </body>

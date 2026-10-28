@@ -40,8 +40,15 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.55
 .bar-inner { max-width: 520px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
 .brand { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .02em; }
 .brand svg { width: 24px; height: 24px; }
+.lang {
+  margin-left: auto; min-height: 36px; min-width: 44px; padding: 0 10px;
+  background: transparent; color: var(--text-2);
+  border: 1px solid var(--line); border-radius: 999px;
+  font: 600 13px var(--num);
+}
+.lang:hover { color: var(--text); border-color: #343b48; }
 .link {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center; gap: 8px;
   font-size: 14px; color: var(--text-2);
   padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
 }
