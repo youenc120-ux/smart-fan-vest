@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>團隊模式</title>
+<meta name="description" content="用一台手機同時監看多件風扇背心的體感溫度與中暑風險。">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .team-summary { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+  .team-summary > div + div { border-left: 1px solid var(--line); }
+  .member { display: grid; gap: 10px; border-left-width: 1px; }
+  .member[data-risk="3"] { border-color: #7f1d1d; background: #1f0a0c; }
+  .member[data-risk="2"] { border-color: #7c5a08; }
+  .member-head { display: flex; align-items: center; gap: 10px; }
+  .member-head h2 { flex: 1; overflow-wrap: anywhere; }
+  .member-head button { min-height: 36px; padding: 0 10px; background: transparent; color: var(--text-2); border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
+  .badge { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
+  .badge.r3 { background: var(--peak); color: #000; }
+  .badge.r2 { background: var(--warm); color: #000; }
+  .badge.r1 { background: rgba(34, 197, 94, .18); color: var(--ok); }
+  .member-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .member-stats .p-value { font-size: 22px; }
+  .member-msg { margin: 0; font-size: 14px; color: var(--text-2); }
+  .member[data-risk="3"] .member-msg { color: var(--err-ink); }
+  #members { display: grid; gap: 14px; }
+  .empty { text-align: center; color: var(--text-2); padding: 28px 18px; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <h1 class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c4 0 6 3.2 5 6.4-.7 2.3-3 3.4-5 3.6M29 16c0 4-3.2 6-6.4 5-2.3-.7-3.4-3-3.6-5M16 29c-4 0-6-3.2-5-6.4.7-2.3 3-3.4 5-3.6M3 16c0-4 3.2-6 6.4-5 2.3.7 3.4 3 3.6 5" fill="none" stroke="#fb923c" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="#f8fafc"/></svg>
+      <span data-i18n="teamTitle">團隊模式</span>
+    </h1>
+    <button class="lang" id="langBtn" type="button" data-i18n="langBtn" data-i18n-aria="langLabel">EN</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel" aria-label="summary">
+    <div class="team-summary">
+      <div><p class="p-label" data-i18n="teamCount">連線中</p><p class="p-value" id="sumCount">0</p></div>
+      <div><p class="p-label" data-i18n="teamDanger">中暑風險</p><p class="p-value" id="sumDanger">0</p></div>
+      <div><p class="p-label" data-i18n="teamMaxFeels">最高體感</p><p class="p-value"><span id="sumMax">—</span><span class="p-unit">°C</span></p></div>
+    </div>
+  </section>
+
+  <div class="notice err" id="unsupported" hidden><p data-i18n="unsupported"></p></div>
+  <div class="notice err" id="teamError" hidden><p id="teamErrorText"></p></div>
+  <button class="primary" type="button" id="addBtn" data-i18n="teamAdd">新增背心</button>
+  <p class="slider-note" data-i18n="teamHint">每點一次「新增背心」加入一件；名稱可以點「改名」換成穿著者的名字。這頁開著時螢幕會保持亮著。</p>
+
+  <div id="members"></div>
+  <p class="empty panel" id="empty" data-i18n="teamEmpty">還沒有背心。點「新增背心」開始監看。</p>
+
+  <a class="team-link" href="./" data-i18n="teamBack">← 回到單人控制頁</a>
+  <p class="foot" id="foot"></p>
+</main>
+
+<script src="i18n.js"></script>
+<script src="team.js"></script>
+</body>
+</html>

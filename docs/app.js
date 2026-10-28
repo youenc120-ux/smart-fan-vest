@@ -3,7 +3,8 @@
   const { ui, state, FLAG, render, buildCurve, pushHistory, fillSettingsForm, sliderFill } = window.FV;
   const { t } = window.I18N;
   const UUID = n => `7a1e000${n}-5c2b-4f0a-9d3e-6b8f2a4c9e10`;
-  const SERVICE = UUID(1), STATUS = UUID(2), CONTROL = UUID(3), CONFIG = UUID(4), SETTINGS = UUID(5);
+  const SERVICE = UUID(1), STATUS = UUID(2), CONTROL = UUID(3), CONFIG = UUID(4), SETTINGS = UUID(5), EXTRA = UUID(6);
+  const NO_CMD = 255;
   const INVALID = -32768;
   const demo = new URLSearchParams(location.search).has('demo');
 
@@ -47,9 +48,24 @@
     state.set = {
       t0: dv.getInt16(0, true) / 10, t1: dv.getInt16(2, true) / 10, t2: dv.getInt16(4, true) / 10,
       boost: dv.getUint8(6), heat: dv.getInt16(7, true) / 10, buzzer: dv.getUint8(9) === 1, useFeels: dv.getUint8(10) === 1,
+      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true,
     };
+    if (dv.byteLength >= 16) {
+      Object.assign(state.set, { maxPct: dv.getUint8(11), hydFeels: dv.getInt16(12, true) / 10,
+        hydMin: dv.getUint8(14), learn: dv.getUint8(15) === 1 });
+    }
     buildCurve();
     fillSettingsForm();
+  }
+
+  function parseExtra(dv) {
+    const ma = v => (v === 0xFFFF ? null : v);
+    state.extra = {
+      has: true, flags: dv.getUint8(0), hotMin: dv.getUint16(1, true), totalHotMin: dv.getUint16(3, true),
+      profile: dv.getUint8(5), stUpper: ma(dv.getUint16(6, true)), stLower: ma(dv.getUint16(8, true)),
+      fw: `${dv.getUint8(10)}.${dv.getUint8(11)}`, learnShift: dv.getInt16(12, true) / 10, learnCount: dv.getUint8(14),
+    };
+    render();
   }
 
   function onStatusUpdated(wasHeat) {
@@ -72,6 +88,15 @@
     statusChar.addEventListener('characteristicvaluechanged', e => parseStatus(e.target.value));
     await statusChar.startNotifications();
     parseStatus(await statusChar.readValue());
+    try {  // 1.0 版以前的韌體沒有 EXTRA，進階功能就不顯示
+      const extraChar = await svc.getCharacteristic(EXTRA);
+      extraChar.addEventListener('characteristicvaluechanged', e => parseExtra(e.target.value));
+      await extraChar.startNotifications();
+      parseExtra(await extraChar.readValue());
+    } catch (_) {
+      state.extra.has = false;
+    }
+    state.deviceName = device.name || '';
     setLink('connected');
   }
 
@@ -120,10 +145,12 @@
     catch (err) { ui.foot.textContent = t('errWrite', { what: t(what), msg: err.message }); return false; }
   }
 
-  function sendControl() {
-    if (demo) demoApply();
-    return write(controlChar, new Uint8Array([state.auto ? 1 : 0, state.manualUpper, state.manualLower]), 'whatCommand');
+  function sendControl(cmd = NO_CMD) {
+    if (demo) { demoCommand(cmd); demoApply(); }
+    return write(controlChar, new Uint8Array([state.auto ? 1 : 0, state.manualUpper, state.manualLower, cmd]), 'whatCommand');
   }
+  window.FV.sendCommand = cmd => sendControl(cmd);  // 給 features.js 用：情境模式、自我檢測、OTA、清除學習
+  window.FV.demo = demo;
 
   // ---------- 螢幕保持亮著（避免手機休眠時藍牙斷線） ----------
   let wakeLock = null;
@@ -167,7 +194,16 @@
     ui.settingsErrorText.textContent = err;
     if (err) return;
 
-    const b = new DataView(new ArrayBuffer(11));
+    const g = id => document.getElementById(id);
+    Object.assign(s, { maxPct: Number(g('setMax').value), hydFeels: n(g('setHydFeels')),
+      hydMin: Math.round(n(g('setHydMin'))), learn: g('setLearn').checked });
+    if (Number.isNaN(s.hydFeels) || s.hydFeels < 25 || s.hydFeels > 45) err = t('errHydFeels');
+    else if (Number.isNaN(s.hydMin) || s.hydMin < 5 || s.hydMin > 120) err = t('errHydMin');
+    ui.settingsError.hidden = !err;
+    ui.settingsErrorText.textContent = err;
+    if (err) return;
+
+    const b = new DataView(new ArrayBuffer(16));
     b.setInt16(0, Math.round(s.t0 * 10), true);
     b.setInt16(2, Math.round(s.t1 * 10), true);
     b.setInt16(4, Math.round(s.t2 * 10), true);
@@ -175,10 +211,14 @@
     b.setInt16(7, Math.round(s.heat * 10), true);
     b.setUint8(9, s.buzzer ? 1 : 0);
     b.setUint8(10, s.useFeels ? 1 : 0);
+    b.setUint8(11, s.maxPct);
+    b.setInt16(12, Math.round(s.hydFeels * 10), true);
+    b.setUint8(14, s.hydMin);
+    b.setUint8(15, s.learn ? 1 : 0);
     ui.saveBtn.disabled = true;
     const ok = await write(settingsChar, b.buffer, 'whatSettings');
     if (ok && !demo) parseSettings(await settingsChar.readValue());  // 讀回背心實際採用的設定
-    if (ok && demo) { state.set = s; buildCurve(); }
+    if (ok && demo) { state.set = s; state.extra.profile = 0; buildCurve(); }
     ui.saveBtn.disabled = state.link !== 'connected';
     ui.settingsNote.textContent = t(ok ? 'settingsSaved' : 'settingsFailed');
     render();
@@ -200,14 +240,51 @@
     return (hi - 32) * 5 / 9;
   }
 
+  // 與韌體 features.ino 的 PRESETS 相同
+  const PROFILES = [null,
+    { t0: 25, t1: 27, t2: 33, boost: 10, maxPct: 100, buzzer: true },
+    { t0: 24, t1: 26, t2: 32, boost: 20, maxPct: 100, buzzer: true },
+    { t0: 27, t1: 29, t2: 36, boost: 0, maxPct: 40, buzzer: false },
+    { t0: 27, t1: 29, t2: 37, boost: 0, maxPct: 60, buzzer: true }];
+  window.FV.PROFILES = PROFILES;
+  let demoHot = 0, demoHydrateAt = 0;
+
+  function demoCommand(cmd) {
+    const x = state.extra;
+    x.flags &= ~0x01;  // 任何操作都當作確認喝水提醒
+    if (cmd >= 0 && cmd < PROFILES.length) {
+      x.profile = cmd;
+      if (PROFILES[cmd]) Object.assign(state.set, PROFILES[cmd]);
+      buildCurve();
+      fillSettingsForm();
+    } else if (cmd === 254) {
+      x.flags = (x.flags | 0x04) & ~0x38;
+      setTimeout(() => { x.flags = (x.flags & ~0x04) | 0x20 | 0x08 | 0x10; x.stUpper = 742; x.stLower = 768; render(); }, 3000);
+    } else if (cmd === 252) {
+      x.learnShift = 0; x.learnCount = 0;
+    }
+  }
+
+  function demoExtra() {
+    const x = state.extra;
+    x.has = true; x.fw = '1.0 (demo)';
+    if (state.feels >= state.set.hydFeels) {  // 示範用：每秒當作 1 分鐘
+      demoHot += 1; x.totalHotMin += 1;
+      if (!demoHydrateAt) demoHydrateAt = state.set.hydMin;
+      if (demoHot >= demoHydrateAt) { x.flags |= 0x01; demoHydrateAt = demoHot + state.set.hydMin; }
+      if (demoHot >= 60) x.flags |= 0x02;
+    }
+    x.hotMin = demoHot;
+  }
+
   function demoApply() {
-    const { t0, t1, t2, boost, heat, useFeels } = state.set, { dmin, lowCap } = state.cfg;
-    const t = useFeels ? state.feels : state.temp;
-    if (!demoFanOn && t >= t1) demoFanOn = true;
-    if (demoFanOn && t < t0) demoFanOn = false;
-    const auto = !demoFanOn ? 0 : t >= t2 ? 100 : Math.max(dmin, Math.round(dmin + (t - t1) / (t2 - t1) * (100 - dmin)));
+    const { t0, t1, t2, boost, heat, useFeels, maxPct } = state.set, { dmin, lowCap } = state.cfg;
+    const temp = useFeels ? state.feels : state.temp;
+    if (!demoFanOn && temp >= t1) demoFanOn = true;
+    if (demoFanOn && temp < t0) demoFanOn = false;
+    const auto = !demoFanOn ? 0 : temp >= t2 ? 100 : Math.max(dmin, Math.round(dmin + (temp - t1) / (t2 - t1) * (100 - dmin)));
     const low = state.batt < 20;
-    const lim = p => { p = low ? Math.min(p, lowCap) : p; return p > 0 && p < dmin ? dmin : p; };
+    const lim = p => { p = Math.min(p, maxPct); p = low ? Math.min(p, lowCap) : p; return p > 0 && p < dmin ? dmin : p; };
     state.upper = lim(state.auto ? auto : state.manualUpper);
     state.lower = lim(state.auto ? (auto ? Math.min(100, auto + boost) : 0) : state.manualLower);
     state.ma = 3 + (state.upper + state.lower) * 8 + (Math.random() - .5) * 30;
@@ -226,6 +303,8 @@
     fillSettingsForm();
     state.batt = 86; state.wh = 0; state.uptime = 0;
     state.temp = 31; state.hum = 60; state.feels = heatIndex(31, 60);
+    state.deviceName = 'FanVest-DEMO';
+    Object.assign(state.extra, { has: true, flags: 0x20 | 0x08 | 0x10, stUpper: 742, stLower: 768, learnShift: -0.8, learnCount: 4 });
     setLink('connected');
     demoApply();
     demoTimer = setInterval(() => {
@@ -236,6 +315,7 @@
       state.batt = Math.max(0, 86 - Math.floor(demoClock / 8));
       state.wh += (state.mv / 1000) * (state.ma / 1000) / 3600 * 60;  // 示範用：時間加速 60 倍
       state.uptime = demoClock;
+      demoExtra();
       demoApply();
     }, 1000);
     ui.foot.textContent = t('demoFoot');

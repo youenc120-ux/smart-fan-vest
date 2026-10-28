@@ -207,3 +207,33 @@ input[type="range"]:disabled { cursor: default; opacity: .35; }
 @media (prefers-reduced-motion: reduce) {
   .arc, .marker, .path, .manual-line, .link-dot, .fan-icon, .alert, .batt-bar div { transition: none; animation: none; }
 }
+
+/* ---- 進階功能 ---- */
+.alert.info { background: #062a3a; color: #bae6fd; border-color: #0e4f6b; }
+.alert.info svg { color: var(--cool); }
+.alert.info button { background: var(--cool); }
+.secondary {
+  background: var(--surface-2); color: var(--text); font-weight: 600;
+  border: 1px solid #343b48; width: 100%;
+}
+.secondary:hover { border-color: var(--accent); }
+.secondary:disabled { color: var(--text-2); border-color: var(--line); cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.chips button {
+  min-height: 40px; padding: 0 14px; border-radius: 999px;
+  background: transparent; color: var(--text-2); border: 1px solid var(--line); font-weight: 500;
+}
+.chips button[aria-pressed="true"] { background: rgba(251, 146, 60, .16); color: var(--accent); border-color: var(--accent); font-weight: 700; }
+.chips button:disabled { cursor: default; opacity: .5; }
+#profileNote { margin-top: 8px; }
+.exposure, .weather { display: grid; gap: 12px; }
+.runtime { display: grid; gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.runtime .p-value { font-size: 26px; }
+.learn-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.learn-row .ghost { flex-shrink: 0; }
+.diag { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 14px 0; font-size: 14px; }
+.diag dt { color: var(--text-2); }
+.diag dd { margin: 0; font-family: var(--num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#diagPanel .secondary { margin-top: 10px; }
+#diagPanel .notice { margin-top: 4px; }
+.team-link { color: var(--accent); text-align: center; text-underline-offset: 3px; padding: 10px; }

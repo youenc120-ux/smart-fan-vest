@@ -22,10 +22,17 @@ window.FV = (() => {
     upper: null, lower: null, auto: true, manualUpper: 50, manualLower: 50,
     mv: null, ma: null, batt: null, flags: FLAG.POWER_MISSING, wh: 0, uptime: 0,
     cfg: { dmin: 30, fail: 70, ocMa: 3000, emptyMv: 10200, fullMv: 12600, lowCap: 70 },
-    set: { t0: 26, t1: 28, t2: 35, boost: 10, heat: 40, buzzer: true, useFeels: true },
+    set: { t0: 26, t1: 28, t2: 35, boost: 10, heat: 40, buzzer: true, useFeels: true,
+      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true },
+    // EXTRA 特徵值（features.ino）：舊版韌體沒有，hasExtra = false
+    extra: { has: false, flags: 0, hotMin: 0, totalHotMin: 0, profile: 0, stUpper: null, stLower: null,
+      fw: '', learnShift: 0, learnCount: 0 },
+    deviceName: '',
     dragging: false,
-    history: [],  // { t, temp, feels, pct }
+    history: [],  // 最近 10 分鐘：{ t, temp, feels, pct }
+    log: [],      // 連線後的完整紀錄（匯出 CSV 用，最多 2 小時）
   };
+  const hooks = [];  // features.js 的額外繪製
 
   const live = () => state.link === 'connected';
   const ctrlTemp = () => (state.set.useFeels && state.feels !== null ? state.feels : state.temp);
@@ -103,6 +110,10 @@ window.FV = (() => {
     if (h.length && now - h[h.length - 1].t < 900) return;
     h.push({ t: now, temp: state.temp, feels: state.feels, pct: Math.max(state.upper || 0, state.lower || 0) });
     while (h.length && now - h[0].t > H.span) h.shift();
+    const s = state;
+    s.log.push({ t: now, temp: s.temp, hum: s.hum, feels: s.feels, upper: s.upper, lower: s.lower, auto: s.auto,
+      mv: s.mv, ma: s.ma, batt: s.batt, flags: s.flags, profile: s.extra.profile });
+    if (s.log.length > 7200) s.log.shift();
   }
 
   function drawHistory() {
@@ -188,6 +199,7 @@ window.FV = (() => {
     renderPower(on);
     drawCurve();
     drawHistory();
+    hooks.forEach(fn => fn(on));
   }
 
   function renderPower(on) {
@@ -220,7 +232,8 @@ window.FV = (() => {
     ui.setT0.value = s.t0; ui.setT1.value = s.t1; ui.setT2.value = s.t2; ui.setHeat.value = s.heat;
     ui.setBoost.value = s.boost; ui.outBoost.textContent = s.boost + '%'; sliderFill(ui.setBoost);
     ui.setFeels.checked = s.useFeels; ui.setBuzzer.checked = s.buzzer;
+    hooks.forEach(fn => fn.fillSettings && fn.fillSettings());
   }
 
-  return { ui, state, FLAG, render, buildCurve, pushHistory, fillSettingsForm, sliderFill, fmt1 };
+  return { ui, state, FLAG, render, buildCurve, pushHistory, fillSettingsForm, sliderFill, fmt1, hooks, el, $ };
 })();
