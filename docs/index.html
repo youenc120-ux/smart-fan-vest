@@ -4,239 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>風扇背心控制</title>
-<meta name="description" content="用手機藍牙控制溫控風扇背心：即時溫度、自動與手動風速。">
+<meta name="description" content="用手機藍牙控制溫控風扇背心：即時溫濕度、體感溫度、分區風速、電源與中暑警示。">
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #000000;
-    --surface: #101318;
-    --surface-2: #181c23;
-    --line: #232833;
-    --text: #f8fafc;
-    --text-2: #a3adbd;
-    --cool: #38bdf8;
-    --warm: #fbbf24;
-    --hot: #fb923c;
-    --peak: #f87171;
-    --idle: #4b5563;
-    --ok: #22c55e;
-    --accent: #fb923c;
-    --accent-press: #f97316;
-    --warn-bg: #2a1f05;
-    --warn-ink: #fcd34d;
-    --err-bg: #2b0f12;
-    --err-ink: #fca5a5;
-    --tc: var(--idle);         /* 隨溫度變色，由 JS 設定 */
-    --radius: 20px;
-    --num: "Inter", "Noto Sans TC", system-ui, sans-serif;
-    --font: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
-    color-scheme: dark;
-  }
-  * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; background: var(--bg); }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font: 400 16px/1.55 var(--font);
-    min-height: 100dvh;
-  }
-  ::selection { background: rgba(251, 146, 60, .35); color: var(--text); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
-
-  /* ---- 頂欄 ---- */
-  .bar {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    background: rgba(0, 0, 0, .92);
-    border-bottom: 1px solid var(--line);
-    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
-  }
-  .bar-inner { max-width: 520px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
-  .brand { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .02em; }
-  .brand svg { width: 24px; height: 24px; }
-  .link {
-    margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: var(--text-2);
-    padding: 6px 12px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-  }
-  .link-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); transition: background-color .3s, box-shadow .3s; }
-  .link[data-state="connected"] { color: var(--text); }
-  .link[data-state="connected"] .link-dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-  .link[data-state="connecting"] .link-dot,
-  .link[data-state="lost"] .link-dot { background: var(--warm); animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { opacity: .3; } }
-
-  main { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(28px + env(safe-area-inset-bottom)); display: grid; gap: 14px; }
-  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
-  h2 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 700; }
-
-  /* ---- 連線 ---- */
-  .connect { display: grid; gap: 12px; }
-  .connect h2 { font-size: 20px; }
-  .connect p { margin: 0; color: var(--text-2); }
-  button { font: inherit; cursor: pointer; border: 0; border-radius: 14px; min-height: 48px; padding: 0 18px; }
-  .primary {
-    background: var(--accent);
-    color: #000;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: background-color .15s, transform .1s;
-  }
-  .primary:hover { background: var(--accent-press); }
-  .primary:active { transform: scale(.98); }
-  .primary:disabled { background: var(--surface-2); color: var(--text-2); cursor: default; transform: none; }
-  .primary svg { width: 20px; height: 20px; }
-  .ghost { background: transparent; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; justify-self: center; }
-  .ghost:hover { color: var(--text); }
-
-  .notice { border-radius: 14px; padding: 12px 14px; font-size: 15px; }
-  .notice.warn { background: var(--warn-bg); color: var(--warn-ink); }
-  .notice.err { background: var(--err-bg); color: var(--err-ink); }
-  .notice p { margin: 0; }
-
-  /* ---- 儀表 ---- */
-  .gauge-panel { padding: 22px 18px 18px; }
-  .gauge { position: relative; width: min(100%, 300px); margin: 0 auto; aspect-ratio: 1; }
-  .gauge > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .track { fill: none; stroke: var(--surface-2); stroke-width: 16; stroke-linecap: round; }
-  .arc {
-    fill: none;
-    stroke: var(--tc);
-    stroke-width: 16;
-    stroke-linecap: round;
-    filter: drop-shadow(0 0 8px var(--tc));
-    transition: stroke-dasharray .9s cubic-bezier(.16, 1, .3, 1), stroke .6s;
-  }
-  .gauge-center {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    text-align: center;
-    gap: 2px;
-    padding-bottom: 6%;
-  }
-  .g-label { font-size: 14px; color: var(--text-2); }
-  .g-temp { font-family: var(--num); font-weight: 600; font-size: clamp(52px, 17vw, 68px); line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .g-temp .unit { font-size: .38em; font-weight: 500; color: var(--text-2); margin-left: 2px; letter-spacing: 0; }
-  .g-level {
-    margin-top: 6px;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--tc);
-    transition: color .6s;
-    min-height: 1.5em;
-  }
-  .g-fan {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 4%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    font-size: 15px;
-    color: var(--text-2);
-  }
-  .g-fan strong { font-family: var(--num); font-weight: 600; font-size: 22px; color: var(--text); font-variant-numeric: tabular-nums; }
-  .fan-icon { width: 22px; height: 22px; color: var(--tc); transition: color .6s; animation: spin 1s linear infinite; animation-play-state: paused; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .hint { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--text-2); font-size: 15px; text-align: center; }
-
-  /* ---- 電源 ---- */
-  .power { display: grid; gap: 12px; }
-  .power-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
-  .power-grid > div + div { border-left: 1px solid var(--line); padding-left: 14px; }
-  .p-label { margin: 0 0 2px; font-size: 14px; color: var(--text-2); }
-  .p-value { margin: 0; font-family: var(--num); font-weight: 600; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .p-unit { font-size: 15px; font-weight: 500; color: var(--text-2); margin-left: 3px; }
-
-  /* ---- 控制 ---- */
-  .segmented {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 4px;
-    margin-top: 12px;
-  }
-  .segmented button { min-height: 44px; background: transparent; color: var(--text-2); font-weight: 500; border-radius: 10px; transition: background-color .2s, color .2s; }
-  .segmented button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); font-weight: 700; box-shadow: inset 0 0 0 1px #343b48; }
-  .segmented button:disabled { cursor: default; }
-  .slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; }
-  .slider-head label { color: var(--text-2); }
-  .slider-head output { font-family: var(--num); font-weight: 600; font-size: 24px; font-variant-numeric: tabular-nums; }
-  input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 44px;
-    margin: 2px 0 0;
-    background: transparent;
-    cursor: pointer;
-    --fill: 50%;
-  }
-  input[type="range"]::-webkit-slider-runnable-track {
-    height: 8px;
-    border-radius: 999px;
-    background: linear-gradient(to right, var(--accent) var(--fill), var(--surface-2) var(--fill));
-  }
-  input[type="range"]::-moz-range-track { height: 8px; border-radius: 999px; background: var(--surface-2); }
-  input[type="range"]::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--accent); }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 28px;
-    height: 28px;
-    margin-top: -10px;
-    border-radius: 50%;
-    background: var(--text);
-    border: 4px solid var(--accent);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, .6);
-  }
-  input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--text); border: 4px solid var(--accent); }
-  input[type="range"]:disabled { cursor: default; opacity: .35; }
-  .slider-note { margin: 0; font-size: 14px; color: var(--text-2); }
-
-  /* ---- 曲線 ---- */
-  .curve .sub { margin: 4px 0 10px; font-size: 14px; color: var(--text-2); }
-  .curve svg { display: block; width: 100%; height: auto; overflow: visible; }
-  .axis { stroke: var(--line); stroke-width: 1; }
-  .tick { fill: var(--text-2); font: 500 11px var(--num); font-variant-numeric: tabular-nums; }
-  .band { fill: rgba(56, 189, 248, .12); }
-  .path { fill: none; stroke: var(--hot); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; transition: opacity .3s; }
-  .path.dim { opacity: .3; }
-  .manual-line { stroke: var(--text); stroke-width: 2; stroke-dasharray: 5 4; transition: opacity .3s; }
-  .marker { transition: transform .9s cubic-bezier(.16, 1, .3, 1); }
-  .marker circle.ring { fill: var(--tc); opacity: .22; }
-  .marker circle.core { fill: var(--tc); stroke: var(--bg); stroke-width: 2.5; }
-  .marker-guide { stroke: var(--tc); stroke-width: 1; stroke-dasharray: 2 3; }
-
-  .foot { text-align: center; font-size: 13px; color: var(--text-2); margin: 0; }
-  [hidden] { display: none !important; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .arc, .marker, .path, .manual-line, .link-dot, .fan-icon { transition: none; animation: none; }
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="bar">
@@ -252,7 +27,7 @@
 <main>
   <section class="panel connect" id="connectPanel" aria-labelledby="connectTitle">
     <h2 id="connectTitle">連線到背心</h2>
-    <p id="connectText">打開背心電源與手機藍牙，再點下方按鈕，從清單選擇「FanVest」。</p>
+    <p id="connectText">打開背心電源與手機藍牙，再點下方按鈕，從清單選擇「FanVest」。第一次連線時手機會要求輸入配對碼（預設 123456）。</p>
     <div class="notice err" id="unsupported" hidden>
       <p>這個瀏覽器不支援藍牙網頁連線。Android 請用 Chrome 開啟本頁；iPhone 請改用 Bluefy 瀏覽器。</p>
     </div>
@@ -263,8 +38,17 @@
     </button>
   </section>
 
+  <section class="alert" id="heatAlert" role="alert" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4.5M12 17.5v.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    <div>
+      <p class="alert-title" id="heatAlertTitle">中暑風險</p>
+      <p id="heatAlertText">請到陰涼處休息、補充水分。</p>
+    </div>
+    <button type="button" id="muteBtn">我知道了</button>
+  </section>
+
   <section class="panel gauge-panel" aria-label="即時讀數">
-    <div class="gauge" id="gauge">
+    <div class="gauge">
       <svg viewBox="0 0 240 240" aria-hidden="true">
         <path class="track" d="M49.29 190.71 A100 100 0 1 1 190.71 190.71"/>
         <path class="arc" id="arc" d="M49.29 190.71 A100 100 0 1 1 190.71 190.71" pathLength="100" stroke-dasharray="0 100"/>
@@ -276,25 +60,16 @@
       </div>
       <div class="g-fan">
         <svg class="fan-icon" id="fanIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c3 0 4.5 2.4 3.8 4.8-.5 1.7-2.2 2.6-3.8 2.7M21.5 12c0 3-2.4 4.5-4.8 3.8-1.7-.5-2.6-2.2-2.7-3.8M12 21.5c-3 0-4.5-2.4-3.8-4.8.5-1.7 2.2-2.6 3.8-2.7M2.5 12c0-3 2.4-4.5 4.8-3.8 1.7.5 2.6 2.2 2.7 3.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>
-        <span>風速</span><strong><span id="pct">—</span>%</strong>
+        <span>前</span><strong><span id="pctFront">—</span>%</strong>
+        <span>後</span><strong><span id="pctBack">—</span>%</strong>
       </div>
     </div>
-    <div class="notice warn" id="sensorError" hidden style="margin-top:14px">
-      <p id="sensorErrorText">溫度感測器沒有回應，風扇暫以安全轉速運轉。請檢查感測器接線。</p>
+    <div class="stats">
+      <div><p class="p-label">濕度</p><p class="p-value"><span id="hum">—</span><span class="p-unit">%</span></p></div>
+      <div><p class="p-label">體感溫度</p><p class="p-value"><span id="feels">—</span><span class="p-unit">°C</span></p></div>
     </div>
+    <div class="notice warn" id="sensorError" hidden><p id="sensorErrorText"></p></div>
     <p class="hint" id="hint">連線後會顯示即時溫度與風速。</p>
-  </section>
-
-  <section class="panel power" aria-labelledby="powerTitle">
-    <h2 id="powerTitle">電源</h2>
-    <div class="power-grid" id="powerGrid">
-      <div><p class="p-label">電流</p><p class="p-value"><span id="amps">—</span><span class="p-unit">A</span></p></div>
-      <div><p class="p-label">電壓</p><p class="p-value"><span id="volts">—</span><span class="p-unit">V</span></p></div>
-      <div><p class="p-label">功率</p><p class="p-value"><span id="watts">—</span><span class="p-unit">W</span></p></div>
-    </div>
-    <div class="notice err" id="overcurrent" hidden><p id="overcurrentText"></p></div>
-    <div class="notice warn" id="fanLow" hidden><p id="fanLowText"></p></div>
-    <p class="slider-note" id="powerNote" hidden>沒有偵測到電流感測器（INA219），其他功能照常運作。</p>
   </section>
 
   <section class="panel control" aria-labelledby="controlTitle">
@@ -303,346 +78,68 @@
       <button type="button" id="modeAuto" aria-pressed="true" disabled>自動</button>
       <button type="button" id="modeManual" aria-pressed="false" disabled>手動</button>
     </div>
-    <div class="slider-head">
-      <label for="slider">手動風速</label>
-      <output id="sliderOut" for="slider">50%</output>
-    </div>
-    <input type="range" id="slider" min="0" max="100" step="5" value="50" disabled>
+    <div class="slider-head"><label for="sliderFront">前胸風速</label><output id="outFront" for="sliderFront">50%</output></div>
+    <input type="range" id="sliderFront" min="0" max="100" step="5" value="50" disabled>
+    <div class="slider-head"><label for="sliderBack">後背風速</label><output id="outBack" for="sliderBack">50%</output></div>
+    <input type="range" id="sliderBack" min="0" max="100" step="5" value="50" disabled>
     <p class="slider-note" id="sliderNote">切換到手動模式後可以拖曳調整。</p>
   </section>
 
+  <section class="panel power" aria-labelledby="powerTitle">
+    <h2 id="powerTitle">電源</h2>
+    <div class="battery" id="battery">
+      <div class="batt-head"><span class="p-label">電池（估算）</span><strong id="battPct">—</strong></div>
+      <div class="batt-bar"><div id="battFill"></div></div>
+    </div>
+    <div class="power-grid" id="powerGrid">
+      <div><p class="p-label">電流</p><p class="p-value"><span id="amps">—</span><span class="p-unit">A</span></p></div>
+      <div><p class="p-label">電壓</p><p class="p-value"><span id="volts">—</span><span class="p-unit">V</span></p></div>
+      <div><p class="p-label">功率</p><p class="p-value"><span id="watts">—</span><span class="p-unit">W</span></p></div>
+    </div>
+    <p class="slider-note" id="usage">—</p>
+    <div class="notice err" id="overcurrent" hidden><p id="overcurrentText"></p></div>
+    <div class="notice warn" id="fanLow" hidden><p id="fanLowText"></p></div>
+    <div class="notice warn" id="lowBatt" hidden><p id="lowBattText"></p></div>
+    <p class="slider-note" id="powerNote" hidden>沒有偵測到電流感測器（INA219），其他功能照常運作。</p>
+  </section>
+
+  <section class="panel history" aria-labelledby="historyTitle">
+    <h2 id="historyTitle">最近 10 分鐘</h2>
+    <div class="legend">
+      <span><i class="lg-temp"></i>溫度</span><span><i class="lg-feels"></i>體感</span><span><i class="lg-fan"></i>風速（右軸）</span>
+    </div>
+    <svg id="historyChart" viewBox="0 0 340 170" role="img" aria-label="最近 10 分鐘溫度與風速"></svg>
+    <p class="slider-note" id="historyNote">連線後開始記錄，網頁關閉後會清除。</p>
+  </section>
+
   <section class="panel curve" aria-labelledby="curveTitle">
-    <h2 id="curveTitle">溫度與風速</h2>
-    <p class="sub" id="curveSub">自動模式依這條曲線調整風速，圓點是現在的位置。</p>
+    <h2 id="curveTitle">溫度與風速曲線</h2>
+    <p class="sub" id="curveSub"></p>
     <svg id="chart" viewBox="0 0 340 190" role="img" aria-label="溫度對應風速曲線"></svg>
   </section>
+
+  <details class="panel settings" id="settings">
+    <summary><h2>設定</h2><span class="slider-note">溫度門檻、警示、蜂鳴器</span></summary>
+    <form id="settingsForm" novalidate>
+      <div class="field"><label for="setT1">啟動溫度</label><span><input type="number" id="setT1" step="0.5" min="16" max="44" inputmode="decimal"> °C</span></div>
+      <div class="field"><label for="setT0">停止溫度</label><span><input type="number" id="setT0" step="0.5" min="15" max="43" inputmode="decimal"> °C</span></div>
+      <div class="field"><label for="setT2">全速溫度</label><span><input type="number" id="setT2" step="0.5" min="17" max="45" inputmode="decimal"> °C</span></div>
+      <div class="field"><label for="setHeat">中暑警示（體感）</label><span><input type="number" id="setHeat" step="0.5" min="30" max="55" inputmode="decimal"> °C</span></div>
+      <div class="slider-head"><label for="setBoost">自動模式後背加強</label><output id="outBoost" for="setBoost">10%</output></div>
+      <input type="range" id="setBoost" min="0" max="50" step="5" value="10">
+      <label class="toggle"><input type="checkbox" id="setFeels"><span>依體感溫度控制（考慮濕度，悶熱時吹更強）</span></label>
+      <label class="toggle"><input type="checkbox" id="setBuzzer"><span>蜂鳴器提醒</span></label>
+      <div class="notice err" id="settingsError" hidden><p id="settingsErrorText"></p></div>
+      <button class="primary" type="submit" id="saveBtn" disabled>儲存到背心</button>
+      <p class="slider-note" id="settingsNote">設定會存在背心裡，重新開機也不會消失。</p>
+    </form>
+  </details>
 
   <button class="ghost" id="disconnectBtn" type="button" hidden>中斷連線</button>
   <p class="foot" id="foot"></p>
 </main>
 
-<script>
-(() => {
-  const SERVICE = '7a1e0001-5c2b-4f0a-9d3e-6b8f2a4c9e10';
-  const STATUS  = '7a1e0002-5c2b-4f0a-9d3e-6b8f2a4c9e10';
-  const CONTROL = '7a1e0003-5c2b-4f0a-9d3e-6b8f2a4c9e10';
-  const CONFIG  = '7a1e0004-5c2b-4f0a-9d3e-6b8f2a4c9e10';
-  const TEMP_INVALID = -32768;
-  const demo = new URLSearchParams(location.search).has('demo');
-
-  const $ = id => document.getElementById(id);
-  const ui = {
-    link: $('link'), linkText: $('linkText'),
-    connectPanel: $('connectPanel'), connectText: $('connectText'), connectBtn: $('connectBtn'), connectBtnText: $('connectBtnText'),
-    unsupported: $('unsupported'), connectError: $('connectError'), connectErrorText: $('connectErrorText'),
-    gauge: $('gauge'), arc: $('arc'), temp: $('temp'), level: $('level'), pct: $('pct'), fanIcon: $('fanIcon'),
-    hint: $('hint'), sensorError: $('sensorError'), sensorErrorText: $('sensorErrorText'),
-    chart: $('chart'), curveSub: $('curveSub'),
-    modeAuto: $('modeAuto'), modeManual: $('modeManual'),
-    slider: $('slider'), sliderOut: $('sliderOut'), sliderNote: $('sliderNote'),
-    disconnectBtn: $('disconnectBtn'), foot: $('foot'),
-    amps: $('amps'), volts: $('volts'), watts: $('watts'), powerGrid: $('powerGrid'), powerNote: $('powerNote'),
-    overcurrent: $('overcurrent'), overcurrentText: $('overcurrentText'), fanLow: $('fanLow'), fanLowText: $('fanLowText'),
-  };
-  // 韌體 STATUS 的狀態旗標
-  const FLAG_POWER_SENSOR_MISSING = 0x01, FLAG_OVERCURRENT = 0x02, FLAG_FAN_LOW_CURRENT = 0x04;
-
-  const state = {
-    link: 'idle',          // idle | connecting | connected | lost
-    temp: null, pct: null, auto: true, manual: 50,
-    cfg: { t0: 27, t1: 28, t2: 35, dmin: 30, fail: 70, ocMa: 3000 },
-    mv: null, ma: null, flags: FLAG_POWER_SENSOR_MISSING,
-  };
-  let device = null, controlChar = null, userDisconnect = false, dragging = false;
-
-  // 溫度分級：顏色＋文字，不只靠顏色辨識
-  function tempLevel(t) {
-    const { t1, t2 } = state.cfg;
-    if (t === null) return { color: 'var(--idle)', text: '' };
-    if (t < t1) return { color: 'var(--cool)', text: '涼爽' };
-    if (t < (t1 + t2) / 2) return { color: 'var(--warm)', text: '溫暖' };
-    if (t < t2) return { color: 'var(--hot)', text: '炎熱' };
-    return { color: 'var(--peak)', text: '高溫・全速散熱' };
-  }
-
-  // ---------- 曲線圖 ----------
-  const C = { x0: 34, x1: 326, y0: 160, y1: 14, tmin: 20, tmax: 40 };
-  const sx = t => C.x0 + (Math.min(Math.max(t, C.tmin), C.tmax) - C.tmin) / (C.tmax - C.tmin) * (C.x1 - C.x0);
-  const sy = p => C.y0 - p / 100 * (C.y0 - C.y1);
-  const NS = 'http://www.w3.org/2000/svg';
-  const el = (tag, attrs, parent) => {
-    const n = document.createElementNS(NS, tag);
-    for (const k in attrs) n.setAttribute(k, attrs[k]);
-    if (parent) parent.appendChild(n);
-    return n;
-  };
-  let chartParts = null;
-
-  function buildChart() {
-    const svg = ui.chart, { t0, t1, t2, dmin } = state.cfg;
-    svg.textContent = '';
-    el('rect', { class: 'band', x: sx(t0), y: C.y1, width: sx(t1) - sx(t0), height: C.y0 - C.y1 }, svg);
-    for (const p of [0, 50, 100]) {
-      el('line', { class: 'axis', x1: C.x0, x2: C.x1, y1: sy(p), y2: sy(p) }, svg);
-      el('text', { class: 'tick', x: C.x0 - 6, y: sy(p) + 4, 'text-anchor': 'end' }, svg).textContent = p + '%';
-    }
-    for (const t of [20, 25, 30, 35, 40]) {
-      el('text', { class: 'tick', x: sx(t), y: C.y0 + 18, 'text-anchor': 'middle' }, svg).textContent = t + '°';
-    }
-    const path = el('path', {
-      class: 'path',
-      d: `M${sx(C.tmin)} ${sy(0)} H${sx(t1)} V${sy(dmin)} L${sx(t2)} ${sy(100)} H${sx(C.tmax)}`,
-    }, svg);
-    const manualLine = el('line', { class: 'manual-line', x1: C.x0, x2: C.x1, y1: sy(50), y2: sy(50), opacity: 0 }, svg);
-    const marker = el('g', { class: 'marker', opacity: 0 }, svg);
-    const guide = el('line', { class: 'marker-guide', x1: 0, x2: 0, y1: 0, y2: 0 }, marker);
-    el('circle', { class: 'ring', r: 13 }, marker);
-    el('circle', { class: 'core', r: 6.5 }, marker);
-    chartParts = { path, manualLine, marker, guide };
-  }
-
-  function drawChart() {
-    const { path, manualLine, marker, guide } = chartParts;
-    const live = state.link === 'connected';
-    path.classList.toggle('dim', live && !state.auto);
-    manualLine.setAttribute('opacity', live && !state.auto ? 1 : 0);
-    manualLine.setAttribute('y1', sy(state.manual));
-    manualLine.setAttribute('y2', sy(state.manual));
-    if (live && state.temp !== null && state.pct !== null) {
-      const x = sx(state.temp), y = sy(state.pct);
-      marker.setAttribute('opacity', 1);
-      marker.style.transform = `translate(${x}px, ${y}px)`;
-      guide.setAttribute('y2', C.y0 - y);
-    } else {
-      marker.setAttribute('opacity', 0);
-    }
-  }
-
-  // ---------- 儀表 ----------
-  function drawGauge(live) {
-    const pct = live && state.pct !== null ? state.pct : 0;
-    const level = tempLevel(live ? state.temp : null);
-    document.documentElement.style.setProperty('--tc', level.color);
-    ui.arc.setAttribute('stroke-dasharray', `${pct} 100`);
-    ui.arc.style.opacity = pct > 0 ? 1 : 0;
-    ui.level.textContent = level.text;
-    // 風扇圖示轉速跟著風速：越快轉一圈越短
-    ui.fanIcon.style.animationDuration = pct > 0 ? (1.8 - pct / 100 * 1.5).toFixed(2) + 's' : '1s';
-    ui.fanIcon.style.animationPlayState = pct > 0 ? 'running' : 'paused';
-  }
-
-  // ---------- 畫面 ----------
-  const LINK_TEXT = { idle: '未連線', connecting: '連線中…', connected: '已連線', lost: '重新連線中…' };
-  const fmtT = t => (Math.round(t * 10) / 10).toFixed(1);
-
-  function setSliderFill() { ui.slider.style.setProperty('--fill', ui.slider.value + '%'); }
-
-  function render() {
-    const live = state.link === 'connected';
-    ui.link.dataset.state = state.link;
-    ui.linkText.textContent = LINK_TEXT[state.link];
-    ui.connectPanel.hidden = live;
-    ui.disconnectBtn.hidden = !live;
-    ui.connectBtn.disabled = state.link === 'connecting' || state.link === 'lost';
-    ui.connectBtnText.textContent = state.link === 'connecting' ? '連線中…' : state.link === 'lost' ? '重新連線中…' : '連線裝置';
-
-    const sensorBad = live && state.temp === null;
-    ui.temp.textContent = live && state.temp !== null ? fmtT(state.temp) : '—';
-    ui.pct.textContent = live && state.pct !== null ? state.pct : '—';
-    ui.sensorError.hidden = !sensorBad;
-    const { t1, t2, fail } = state.cfg;
-    ui.sensorErrorText.textContent = `溫度感測器沒有回應，風扇暫以 ${fail}% 安全轉速運轉。請檢查感測器接線。`;
-    if (!live) ui.hint.textContent = '連線後會顯示即時溫度與風速。';
-    else if (state.auto) ui.hint.textContent = `自動模式：${t1}°C 以上開始送風，${t2}°C 全速。`;
-    else ui.hint.textContent = '手動模式：風速由滑桿決定，不受溫度影響。';
-    ui.curveSub.textContent = state.auto || !live
-      ? '自動模式依這條曲線調整風速，圓點是現在的位置。藍色區是遲滯區：風扇轉動後要降到更低溫才會停。'
-      : '手動模式中，虛線是你設定的風速；曲線僅供參考。';
-    drawGauge(live);
-
-    ui.modeAuto.disabled = ui.modeManual.disabled = !live;
-    ui.modeAuto.setAttribute('aria-pressed', state.auto);
-    ui.modeManual.setAttribute('aria-pressed', !state.auto);
-    ui.slider.disabled = !live || state.auto;
-    if (!dragging) { ui.slider.value = state.manual; ui.sliderOut.textContent = state.manual + '%'; }
-    setSliderFill();
-    ui.sliderNote.textContent = !live ? '連線後可以使用。' : state.auto ? '切換到手動模式後可以拖曳調整。' : `低於 ${state.cfg.dmin}% 時風扇可能轉不動，會自動提高到 ${state.cfg.dmin}%；拉到 0 為停止。`;
-    renderPower(live);
-    drawChart();
-  }
-
-  function renderPower(live) {
-    const missing = live && (state.flags & FLAG_POWER_SENSOR_MISSING);
-    const has = live && !missing && state.mv !== null;
-    const v = has ? state.mv / 1000 : 0, a = has ? Math.max(0, state.ma) / 1000 : 0;
-    ui.volts.textContent = has ? v.toFixed(1) : '—';
-    ui.amps.textContent = has ? a.toFixed(2) : '—';
-    ui.watts.textContent = has ? (v * a).toFixed(1) : '—';
-    ui.powerGrid.style.opacity = missing ? .4 : 1;
-    ui.powerNote.hidden = !missing;
-    ui.overcurrent.hidden = !(live && (state.flags & FLAG_OVERCURRENT));
-    ui.overcurrentText.textContent = `電流超過 ${(state.cfg.ocMa / 1000).toFixed(1)}A，已自動停止風扇保護電路。請檢查風扇與接線，排除後切換一次模式或調整風速即可恢復。`;
-    ui.fanLow.hidden = !(live && (state.flags & FLAG_FAN_LOW_CURRENT));
-    ui.fanLowText.textContent = `風速 ${state.pct}% 但電流只有 ${has ? Math.round(state.ma) : '—'} mA，風扇可能沒接好或斷線。`;
-  }
-
-  function setLink(s) { state.link = s; render(); }
-  function showError(msg) {
-    ui.connectError.hidden = !msg;
-    ui.connectErrorText.textContent = msg || '';
-  }
-
-  // ---------- 藍牙 ----------
-  function parseStatus(dv) {
-    const t = dv.getInt16(0, true);
-    state.temp = t === TEMP_INVALID ? null : t / 10;
-    state.pct = dv.getUint8(2);
-    state.auto = dv.getUint8(3) === 1;
-    if (!dragging) state.manual = dv.getUint8(4);
-    if (dv.byteLength >= 10) {  // 舊版韌體沒有電流資料
-      state.mv = dv.getUint16(5, true);
-      state.ma = dv.getInt16(7, true);
-      state.flags = dv.getUint8(9);
-    }
-    render();
-  }
-
-  function parseConfig(dv) {
-    state.cfg = {
-      t0: dv.getInt16(0, true) / 10, t1: dv.getInt16(2, true) / 10, t2: dv.getInt16(4, true) / 10,
-      dmin: dv.getUint8(6), fail: dv.getUint8(7),
-      ocMa: dv.byteLength >= 10 ? dv.getUint16(8, true) : 3000,
-    };
-    buildChart();
-  }
-
-  async function openGatt() {
-    const server = await device.gatt.connect();
-    const svc = await server.getPrimaryService(SERVICE);
-    const [statusChar, ctrl, cfgChar] = await Promise.all([
-      svc.getCharacteristic(STATUS), svc.getCharacteristic(CONTROL), svc.getCharacteristic(CONFIG),
-    ]);
-    controlChar = ctrl;
-    parseConfig(await cfgChar.readValue());
-    statusChar.addEventListener('characteristicvaluechanged', e => parseStatus(e.target.value));
-    await statusChar.startNotifications();
-    parseStatus(await statusChar.readValue());
-    setLink('connected');
-  }
-
-  async function connect() {
-    showError('');
-    if (demo) return startDemo();
-    try {
-      setLink('connecting');
-      device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
-      device.addEventListener('gattserverdisconnected', onDisconnected);
-      userDisconnect = false;
-      await openGatt();
-    } catch (err) {
-      setLink('idle');
-      if (err.name === 'NotFoundError') return;  // 使用者取消選擇
-      showError(`連不上背心（${err.message}）。請確認背心電源已開啟、距離在幾公尺內，再試一次。`);
-    }
-  }
-
-  async function onDisconnected() {
-    controlChar = null;
-    if (userDisconnect) { setLink('idle'); return; }
-    setLink('lost');
-    for (const wait of [500, 1500, 3000]) {
-      await new Promise(r => setTimeout(r, wait));
-      try { await openGatt(); return; } catch (_) { /* 再試一次 */ }
-    }
-    setLink('idle');
-    showError('和背心的連線中斷了。請確認背心電源與距離，再點「連線裝置」。');
-  }
-
-  function disconnect() {
-    userDisconnect = true;
-    if (demo) { stopDemo(); setLink('idle'); return; }
-    if (device && device.gatt.connected) device.gatt.disconnect();
-    else setLink('idle');
-  }
-
-  async function sendControl() {
-    const bytes = new Uint8Array([state.auto ? 1 : 0, state.manual]);
-    if (demo) return demoApply();
-    if (!controlChar) return;
-    try { await controlChar.writeValueWithResponse(bytes); }
-    catch (err) { ui.foot.textContent = `指令沒有送出（${err.message}），請再試一次。`; }
-  }
-
-  // ---------- 示範模式（網址加上 ?demo，不需要硬體） ----------
-  let demoTimer = null, demoClock = 0, demoFanOn = false;
-  function demoAuto(t) {
-    const { t0, t1, t2, dmin } = state.cfg;
-    if (!demoFanOn && t >= t1) demoFanOn = true;
-    if (demoFanOn && t < t0) demoFanOn = false;
-    if (!demoFanOn) return 0;
-    if (t >= t2) return 100;
-    return Math.max(dmin, Math.round(dmin + (t - t1) / (t2 - t1) * (100 - dmin)));
-  }
-  function demoApply() {
-    const m = state.manual > 0 && state.manual < state.cfg.dmin ? state.cfg.dmin : state.manual;
-    state.pct = state.auto ? demoAuto(state.temp) : m;
-    // 模擬四顆風扇：全速約 1.6A，電池 12.0V 左右
-    state.ma = state.pct ? 120 + state.pct * 15 + (Math.random() - .5) * 40 : 3;
-    state.mv = 12050 - state.ma * 0.3;
-    state.flags = 0;
-    render();
-  }
-  function startDemo() {
-    buildChart();
-    state.temp = 31.5;
-    setLink('connected');
-    demoApply();
-    demoTimer = setInterval(() => {
-      demoClock += 1;
-      state.temp = 31 + 5 * Math.sin(demoClock / 9) + (Math.random() - .5) * .3;
-      demoApply();
-    }, 1000);
-    ui.foot.textContent = '示範模式：溫度為模擬資料。';
-  }
-  function stopDemo() { clearInterval(demoTimer); ui.foot.textContent = ''; }
-
-  // ---------- 事件 ----------
-  ui.connectBtn.addEventListener('click', connect);
-  ui.disconnectBtn.addEventListener('click', disconnect);
-  ui.modeAuto.addEventListener('click', () => { state.auto = true; render(); sendControl(); });
-  ui.modeManual.addEventListener('click', () => { state.auto = false; render(); sendControl(); });
-
-  let sendTimer = null;
-  ui.slider.addEventListener('pointerdown', () => { dragging = true; });
-  ui.slider.addEventListener('input', () => {
-    state.manual = Number(ui.slider.value);
-    ui.sliderOut.textContent = state.manual + '%';
-    setSliderFill();
-    clearTimeout(sendTimer);
-    sendTimer = setTimeout(sendControl, 120);  // 拖曳時節流，避免塞爆藍牙
-  });
-  ui.slider.addEventListener('change', () => {
-    dragging = false;
-    clearTimeout(sendTimer);
-    sendControl();
-    render();
-  });
-
-  if (!demo && !navigator.bluetooth) {
-    ui.unsupported.hidden = false;
-    ui.connectBtn.disabled = true;
-    ui.connectText.hidden = true;
-  }
-  if (demo) ui.connectText.textContent = '示範模式：點下方按鈕，用模擬資料預覽介面。';
-
-  buildChart();
-  render();
-  if (demo) ui.connectBtn.disabled = false;
-
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
-})();
-</script>
+<script src="ui.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

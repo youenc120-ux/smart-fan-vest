@@ -1,33 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 840" width="1200" height="840">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 990" width="1200" height="990">
   <style>
     text { font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; fill: #222; }
     .w { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-    .v12 { stroke: #d32f2f; }
-    .v5 { stroke: #ef6c00; }
-    .v33 { stroke: #1565c0; }
-    .sig { stroke: #2e7d32; }
-    .gnd { stroke: #222; }
-    .sw { stroke: #6a1b9a; }
+    .v12 { stroke: #d32f2f; } .v5 { stroke: #ef6c00; } .v33 { stroke: #1565c0; }
+    .sig { stroke: #2e7d32; } .gnd { stroke: #222; } .sw { stroke: #6a1b9a; }
     .box { stroke: #333; stroke-width: 2; }
     .part { fill: #fff; stroke: #333; stroke-width: 2; }
     .dot { fill: #222; }
     .pin { fill: #fff; stroke: #333; stroke-width: 2; }
-    .s13 { font-size: 13px; }
-    .s14 { font-size: 14px; }
-    .s16 { font-size: 16px; }
-    .b { font-weight: bold; }
+    .s13 { font-size: 13px; } .s14 { font-size: 14px; } .s16 { font-size: 16px; } .b { font-weight: bold; }
   </style>
-  <rect width="1200" height="840" fill="#fff"/>
+  <defs>
+    <g id="gnd"><path d="M-15 0 H15 M-9 7 H9 M-3 14 H3" fill="none" stroke="#222" stroke-width="2.5" stroke-linecap="round"/></g>
+    <g id="fan">
+      <path d="M0 -50 V0" class="w v12"/>
+      <rect x="-32" y="0" width="64" height="100" rx="8" class="part"/>
+      <circle cx="0" cy="38" r="22" class="part"/>
+      <text x="0" y="45" text-anchor="middle" font-size="17" class="b">M</text>
+      <path d="M0 100 V160" class="w sw"/>
+    </g>
+    <g id="diode">
+      <polygon points="-15,30 15,30 0,2" fill="#fff" stroke="#333" stroke-width="2"/>
+      <line x1="-15" y1="0" x2="15" y2="0" stroke="#333" stroke-width="3"/>
+    </g>
+  </defs>
+  <rect width="1200" height="990" fill="#fff"/>
 
   <!-- 標題與圖例 -->
-  <text x="40" y="62" font-size="32" class="b">智能風扇背心電路圖（實作版）</text>
+  <text x="40" y="62" font-size="30" class="b">智能風扇背心電路圖（實作版）</text>
   <g class="s13">
-    <line x1="660" y1="40" x2="690" y2="40" class="w v12"/><text x="696" y="45">+12V 風扇電源</text>
-    <line x1="820" y1="40" x2="850" y2="40" class="w v5"/><text x="856" y="45">USB 5V</text>
-    <line x1="930" y1="40" x2="960" y2="40" class="w v33"/><text x="966" y="45">3.3V</text>
-    <line x1="1020" y1="40" x2="1050" y2="40" class="w sig"/><text x="1056" y="45">訊號</text>
-    <line x1="660" y1="68" x2="690" y2="68" class="w gnd"/><text x="696" y="73">GND（全部共地）</text>
-    <line x1="820" y1="68" x2="850" y2="68" class="w sw"/><text x="856" y="73">風扇負極（受 Q1 開關）</text>
+    <line x1="640" y1="34" x2="670" y2="34" class="w v12"/><text x="676" y="39">+12V 風扇電源</text>
+    <line x1="800" y1="34" x2="830" y2="34" class="w v5"/><text x="836" y="39">USB 5V</text>
+    <line x1="910" y1="34" x2="940" y2="34" class="w v33"/><text x="946" y="39">3.3V</text>
+    <line x1="1000" y1="34" x2="1030" y2="34" class="w sig"/><text x="1036" y="39">訊號</text>
+    <line x1="640" y1="62" x2="670" y2="62" class="w gnd"/><text x="676" y="67">GND（全部共地）</text>
+    <line x1="800" y1="62" x2="830" y2="62" class="w sw"/><text x="836" y="67">風扇負極（受 Q1、Q2 開關）</text>
   </g>
 
   <!-- 電池 -->
@@ -37,151 +44,141 @@
   <text x="230" y="155" text-anchor="end" class="s13">DC +12V</text>
   <text x="230" y="195" text-anchor="end" class="s13">DC −</text>
   <text x="230" y="285" text-anchor="end" class="s13">USB 5V</text>
+  <path d="M240 190 H270 V215" class="w gnd"/>
+  <use href="#gnd" x="270" y="215"/>
 
-  <!-- +12V 主線與保險絲 -->
+  <!-- +12V：保險絲 → INA219 → 風扇 -->
   <path d="M240 150 H300" class="w v12"/>
   <rect x="300" y="138" width="60" height="24" class="part"/>
   <text x="330" y="128" text-anchor="middle" class="s14">F1 保險絲 3A</text>
-  <path d="M360 150 H480 M600 150 H1120" class="w v12"/>
-  <text x="700" y="140" text-anchor="middle" class="s14" fill="#d32f2f">+12V</text>
-
-  <!-- U1 INA219 電流／電壓感測（串在 +12V 主線上） -->
+  <path d="M360 150 H480 M600 150 H1060" class="w v12"/>
   <rect x="480" y="125" width="120" height="50" rx="6" fill="#fff3e0" stroke="#333" stroke-width="2"/>
   <text x="540" y="148" text-anchor="middle" class="s14 b">U1 INA219</text>
   <text x="540" y="166" text-anchor="middle" class="s13">VIN+ → VIN−</text>
   <text x="540" y="115" text-anchor="middle" class="s13">電流／電壓感測</text>
+  <text x="640" y="140" class="s14" fill="#d32f2f">+12V</text>
   <path d="M520 175 V380" class="w sig"/>
-  <path d="M560 175 V380" class="w sig" stroke-dasharray="7 5"/>
+  <path d="M545 175 V380" class="w sig" stroke-dasharray="7 5"/>
   <text x="514" y="235" text-anchor="end" class="s13">SDA</text>
-  <text x="566" y="235" class="s13">SCL</text>
+  <text x="551" y="235" class="s13">SCL</text>
   <text x="510" y="200" text-anchor="end" class="s13">VCC 接 3V3、GND 共地</text>
 
-  <!-- 電池 DC− 接地 -->
-  <path d="M240 190 H270 V215" class="w gnd"/>
-  <path d="M255 215 H285 M261 222 H279 M267 229 H273" class="w gnd" stroke-width="2.5"/>
+  <!-- 前胸：風扇 1、2，D1，Q1 -->
+  <use href="#fan" x="760" y="200"/>
+  <use href="#fan" x="840" y="200"/>
+  <text x="760" y="288" text-anchor="middle" class="s13">風扇1</text>
+  <text x="840" y="288" text-anchor="middle" class="s13">風扇2</text>
+  <path d="M700 150 V230 M700 262 V360 M700 360 H840" class="w" stroke="#333"/>
+  <path d="M700 360 H840" class="w sw"/>
+  <use href="#diode" x="700" y="232"/>
+  <text x="690" y="285" text-anchor="end" class="s13">D1</text>
+  <text x="800" y="388" text-anchor="middle" class="s14 b">前胸</text>
 
-  <!-- USB 5V 到 ESP32 -->
-  <path d="M240 280 H460 V380" class="w v5"/>
-  <text x="350" y="270" text-anchor="middle" class="s14">USB 線（5V）</text>
+  <!-- 後背：風扇 3、4，D2，Q2 -->
+  <use href="#fan" x="1000" y="200"/>
+  <use href="#fan" x="1080" y="200"/>
+  <text x="1000" y="288" text-anchor="middle" class="s13">風扇3</text>
+  <text x="1080" y="288" text-anchor="middle" class="s13">風扇4</text>
+  <path d="M1060 150 H1080" class="w v12"/>
+  <path d="M940 150 V230 M940 262 V360" class="w" stroke="#333"/>
+  <path d="M940 360 H1080" class="w sw"/>
+  <use href="#diode" x="940" y="232"/>
+  <text x="930" y="285" text-anchor="end" class="s13">D2</text>
+  <text x="1040" y="388" text-anchor="middle" class="s14 b">後背</text>
 
-  <!-- 風扇 1~4（並聯） -->
-  <defs><g id="fan">
-    <path d="M0 -50 V0" class="w v12"/>
-    <rect x="-35" y="0" width="70" height="110" rx="8" class="part"/>
-    <circle cx="0" cy="42" r="24" class="part"/>
-    <text x="0" y="49" text-anchor="middle" font-size="18" class="b">M</text>
-    <text x="6" y="-6" class="s14 b">+</text>
-    <text x="6" y="130" class="s14 b">−</text>
-    <path d="M0 110 V170" class="w sw"/>
-  </g></defs>
-  <use href="#fan" x="880" y="200"/>
-  <use href="#fan" x="960" y="200"/>
-  <use href="#fan" x="1040" y="200"/>
-  <use href="#fan" x="1120" y="200"/>
-  <text x="880" y="295" text-anchor="middle" class="s13">風扇1</text>
-  <text x="960" y="295" text-anchor="middle" class="s13">風扇2</text>
-  <text x="1040" y="295" text-anchor="middle" class="s13">風扇3</text>
-  <text x="1120" y="295" text-anchor="middle" class="s13">風扇4</text>
-  <path d="M760 370 H1120" class="w sw"/>
-  <text x="1000" y="394" text-anchor="middle" class="s13">四顆 12V 風扇並聯 → 風扇負極</text>
-  <circle cx="880" cy="150" r="5" class="dot"/>
-  <circle cx="960" cy="150" r="5" class="dot"/>
-  <circle cx="1040" cy="150" r="5" class="dot"/>
-  <circle cx="880" cy="370" r="5" class="dot"/>
-  <circle cx="960" cy="370" r="5" class="dot"/>
-  <circle cx="1040" cy="370" r="5" class="dot"/>
+  <g>
+    <circle cx="700" cy="150" r="5" class="dot"/><circle cx="760" cy="150" r="5" class="dot"/><circle cx="840" cy="150" r="5" class="dot"/>
+    <circle cx="940" cy="150" r="5" class="dot"/><circle cx="1000" cy="150" r="5" class="dot"/>
+    <circle cx="700" cy="360" r="5" class="dot"/><circle cx="760" cy="360" r="5" class="dot"/>
+    <circle cx="940" cy="360" r="5" class="dot"/><circle cx="1000" cy="360" r="5" class="dot"/>
+  </g>
 
-  <!-- D1 飛輪二極體（陰極朝上接 +12V） -->
-  <path d="M800 150 V250 M800 280 V370" class="w"  stroke="#333"/>
-  <polygon points="785,280 815,280 800,252" fill="#fff" stroke="#333" stroke-width="2"/>
-  <line x1="785" y1="250" x2="815" y2="250" stroke="#333" stroke-width="3"/>
-  <text x="780" y="262" text-anchor="end" class="s14">D1 1N5819</text>
-  <text x="780" y="280" text-anchor="end" class="s13">白環端接 +12V</text>
-  <circle cx="800" cy="150" r="5" class="dot"/>
-  <circle cx="800" cy="370" r="5" class="dot"/>
-
-  <!-- Q1 N-MOSFET（低側開關） -->
-  <path d="M760 370 V425 H745" class="w sw"/>
-  <path d="M745 475 H760 V640" class="w gnd"/>
-  <path d="M753 450 H760 V475" fill="none" stroke="#333" stroke-width="2"/>
-  <polygon points="746,450 755,444 755,456" fill="#333"/>
-  <line x1="745" y1="413" x2="745" y2="487" stroke="#333" stroke-width="3"/>
-  <line x1="733" y1="425" x2="733" y2="475" stroke="#333" stroke-width="3"/>
-  <text x="768" y="412" class="s13">D</text>
-  <text x="768" y="500" class="s13">S</text>
-  <text x="722" y="440" class="s13">G</text>
-  <text x="780" y="440" class="s14 b">Q1 N-MOSFET</text>
-  <text x="780" y="460" class="s13">D4184 模組（4 顆風扇建議用模組）</text>
-  <text x="780" y="480" class="s13">低側開關：接在風扇負極</text>
-
-  <!-- R1、R2 -->
-  <path d="M560 450 H600" class="w sig"/>
-  <rect x="600" y="440" width="60" height="20" class="part"/>
-  <text x="630" y="432" text-anchor="middle" class="s13">R1 100Ω</text>
-  <path d="M660 450 H733" class="w sig"/>
-  <circle cx="700" cy="450" r="5" class="dot"/>
-  <path d="M700 450 V510" class="w sig"/>
-  <rect x="690" y="510" width="20" height="60" class="part"/>
-  <text x="682" y="537" text-anchor="end" class="s13">R2 10kΩ</text>
-  <text x="682" y="555" text-anchor="end" class="s13">（G–S 下拉）</text>
-  <path d="M700 570 V640" class="w gnd"/>
-  <path d="M685 640 H715 M691 647 H709 M697 654 H703" class="w gnd" stroke-width="2.5"/>
-  <path d="M745 640 H775 M751 647 H769 M757 654 H763" class="w gnd" stroke-width="2.5"/>
+  <!-- Q1、Q2：D4184 模組（低側開關） -->
+  <path d="M700 360 V420" class="w sw"/>
+  <rect x="650" y="420" width="100" height="60" rx="6" fill="#f3e5f5" stroke="#333" stroke-width="2"/>
+  <text x="700" y="446" text-anchor="middle" class="s14 b">Q1 D4184</text>
+  <text x="700" y="466" text-anchor="middle" class="s13">前胸</text>
+  <path d="M700 480 V495" class="w gnd"/><use href="#gnd" x="700" y="495"/>
+  <path d="M940 360 V420" class="w sw"/>
+  <rect x="890" y="420" width="100" height="60" rx="6" fill="#f3e5f5" stroke="#333" stroke-width="2"/>
+  <text x="940" y="446" text-anchor="middle" class="s14 b">Q2 D4184</text>
+  <text x="940" y="466" text-anchor="middle" class="s13">後背</text>
+  <path d="M940 480 V495" class="w gnd"/><use href="#gnd" x="940" y="495"/>
+  <text x="1005" y="436" class="s13">D4184 實際接法：</text>
+  <text x="1005" y="454" class="s13">VIN± 接電池、OUT± 接</text>
+  <text x="1005" y="472" class="s13">該組風扇、PWM 接 ESP32</text>
+  <text x="1005" y="500" class="s13">D1、D2：1N5819，</text>
+  <text x="1005" y="518" class="s13">白環接 +12V</text>
 
   <!-- ESP32 -->
-  <rect x="360" y="380" width="200" height="250" rx="10" fill="#e3f2fd" class="box"/>
-  <text x="460" y="402" text-anchor="middle" class="s13">USB</text>
-  <text x="520" y="420" text-anchor="middle" class="s13">21</text>
-  <text x="555" y="420" text-anchor="end" class="s13">22</text>
-  <circle cx="520" cy="380" r="5" class="pin"/>
-  <circle cx="560" cy="380" r="5" class="pin"/>
-  <text x="460" y="445" text-anchor="middle" font-size="24" class="b">ESP32</text>
-  <text x="460" y="470" text-anchor="middle" class="s14">開發板</text>
+  <path d="M240 280 H420 V380" class="w v5"/>
+  <text x="330" y="270" text-anchor="middle" class="s14">USB 線（5V）</text>
+  <rect x="360" y="380" width="200" height="400" rx="10" fill="#e3f2fd" class="box"/>
+  <text x="420" y="402" text-anchor="middle" class="s13">USB</text>
+  <text x="520" y="400" text-anchor="middle" class="s13">21</text>
+  <text x="545" y="414" text-anchor="middle" class="s13">22</text>
+  <text x="460" y="600" text-anchor="middle" font-size="24" class="b">ESP32</text>
+  <text x="460" y="625" text-anchor="middle" class="s14">開發板</text>
   <text x="550" y="455" text-anchor="end" class="s14">GPIO25</text>
-  <text x="550" y="473" text-anchor="end" class="s13">（PWM）</text>
-  <text x="370" y="505" class="s14">3V3</text>
-  <text x="370" y="545" class="s14">GPIO4</text>
-  <text x="370" y="585" class="s14">GND</text>
-  <path d="M460 630 V660" class="w gnd"/>
-  <path d="M445 660 H475 M451 667 H469 M457 674 H463" class="w gnd" stroke-width="2.5"/>
+  <text x="550" y="545" text-anchor="end" class="s14">GPIO26</text>
+  <text x="370" y="435" class="s14">3V3</text>
+  <text x="370" y="470" class="s14">GPIO4</text>
+  <text x="370" y="505" class="s14">GND</text>
+  <text x="370" y="585" class="s14">GPIO14</text>
+  <text x="370" y="665" class="s14">GPIO32</text>
+  <text x="370" y="745" class="s14">GPIO33</text>
+  <path d="M560 450 H650" class="w sig"/>
+  <text x="605" y="442" text-anchor="middle" class="s13">PWM</text>
+  <path d="M560 540 H870 V470 H890" class="w sig"/>
+  <text x="715" y="532" text-anchor="middle" class="s13">PWM</text>
+  <path d="M460 780 V800" class="w gnd"/><use href="#gnd" x="460" y="800"/>
 
-  <!-- DS18B20 -->
-  <rect x="40" y="460" width="190" height="150" rx="10" fill="#eef8ee" class="box"/>
-  <text x="95" y="530" text-anchor="middle" class="s16 b">DS18B20</text>
-  <text x="95" y="555" text-anchor="middle" class="s14">溫度感測器</text>
-  <text x="220" y="505" text-anchor="end" class="s13">VCC</text>
-  <text x="220" y="545" text-anchor="end" class="s13">DQ</text>
-  <text x="220" y="585" text-anchor="end" class="s13">GND</text>
-  <path d="M230 500 H360" class="w v33"/>
-  <path d="M230 540 H360" class="w sig"/>
-  <path d="M230 580 H360" class="w gnd"/>
-  <!-- R3 上拉 -->
-  <path d="M300 500 V506 M300 534 V540" fill="none" stroke="#333" stroke-width="2"/>
-  <rect x="293" y="506" width="14" height="28" class="part"/>
-  <text x="314" y="525" class="s13">R3 4.7kΩ</text>
-  <circle cx="300" cy="500" r="4.5" class="dot"/>
-  <circle cx="300" cy="540" r="4.5" class="dot"/>
+  <!-- DHT11 -->
+  <rect x="40" y="400" width="190" height="120" rx="10" fill="#eef8ee" class="box"/>
+  <text x="95" y="455" text-anchor="middle" class="s16 b">DHT11</text>
+  <text x="95" y="478" text-anchor="middle" class="s13">溫濕度感測器</text>
+  <text x="220" y="435" text-anchor="end" class="s13">VCC</text>
+  <text x="220" y="470" text-anchor="end" class="s13">DATA</text>
+  <text x="220" y="505" text-anchor="end" class="s13">GND</text>
+  <path d="M230 430 H360" class="w v33"/>
+  <path d="M230 465 H360" class="w sig"/>
+  <path d="M230 500 H360" class="w gnd"/>
+  <text x="295" y="458" text-anchor="middle" class="s13">裸元件加 10kΩ 上拉</text>
 
-  <!-- 腳位端點 -->
+  <!-- 蜂鳴器 -->
+  <rect x="40" y="550" width="190" height="60" rx="10" fill="#fffde7" class="box"/>
+  <text x="60" y="577" class="s16 b">蜂鳴器</text>
+  <text x="60" y="597" class="s13">主動式 3.3V</text>
+  <text x="220" y="585" text-anchor="end" class="s13">I/O</text>
+  <path d="M230 580 H360" class="w sig"/>
+
+  <!-- WS2812B -->
+  <rect x="40" y="630" width="190" height="60" rx="10" fill="#fffde7" class="box"/>
+  <text x="60" y="657" class="s16 b">WS2812B</text>
+  <text x="60" y="677" class="s13">RGB 狀態燈</text>
+  <text x="220" y="665" text-anchor="end" class="s13">DIN</text>
+  <path d="M230 660 H360" class="w sig"/>
+
+  <!-- 按鈕 -->
+  <rect x="40" y="710" width="190" height="60" rx="10" fill="#fffde7" class="box"/>
+  <text x="60" y="737" class="s16 b">按鈕</text>
+  <text x="60" y="757" class="s13">另一腳接 GND</text>
+  <path d="M230 740 H360" class="w sig"/>
+  <text x="295" y="812" text-anchor="middle" class="s13">蜂鳴器、WS2812B 的 VCC 接 3V3、GND 共地</text>
+
   <g>
-    <circle cx="240" cy="150" r="5" class="pin"/>
-    <circle cx="240" cy="190" r="5" class="pin"/>
-    <circle cx="240" cy="280" r="5" class="pin"/>
-    <circle cx="460" cy="380" r="5" class="pin"/>
-    <circle cx="560" cy="450" r="5" class="pin"/>
-    <circle cx="360" cy="500" r="5" class="pin"/>
-    <circle cx="360" cy="540" r="5" class="pin"/>
-    <circle cx="360" cy="580" r="5" class="pin"/>
-    <circle cx="460" cy="630" r="5" class="pin"/>
-    <circle cx="230" cy="500" r="5" class="pin"/>
-    <circle cx="230" cy="540" r="5" class="pin"/>
-    <circle cx="230" cy="580" r="5" class="pin"/>
+    <circle cx="240" cy="150" r="5" class="pin"/><circle cx="240" cy="190" r="5" class="pin"/><circle cx="240" cy="280" r="5" class="pin"/>
+    <circle cx="420" cy="380" r="5" class="pin"/><circle cx="520" cy="380" r="5" class="pin"/><circle cx="545" cy="380" r="5" class="pin"/>
+    <circle cx="560" cy="450" r="5" class="pin"/><circle cx="560" cy="540" r="5" class="pin"/>
+    <circle cx="360" cy="430" r="5" class="pin"/><circle cx="360" cy="465" r="5" class="pin"/><circle cx="360" cy="500" r="5" class="pin"/>
+    <circle cx="360" cy="580" r="5" class="pin"/><circle cx="360" cy="660" r="5" class="pin"/><circle cx="360" cy="740" r="5" class="pin"/>
+    <circle cx="460" cy="780" r="5" class="pin"/>
   </g>
 
   <!-- 接線重點 -->
-  <rect x="40" y="695" width="1120" height="130" rx="10" fill="#fffaf0" stroke="#c9a227" stroke-width="2" stroke-dasharray="8 5"/>
-  <text x="60" y="725" class="s16 b">接線重點</text>
-  <text x="60" y="752" class="s14">① 電池調速固定在最高段，轉速改由 ESP32 的 PWM 控制。　② 所有 GND 必須共地：ESP32 的 GND 要接到 Q1 的 S 極（電池 DC−）。</text>
-  <text x="60" y="777" class="s14">③ D1 有白環的那端（陰極）接 +12V。　④ 腳位：GPIO25 = PWM、GPIO4 = 溫度、GPIO21/22 = INA219 SDA/SCL。</text>
-  <text x="60" y="802" class="s14">⑤ 用 D4184 模組時：VIN+/VIN− 接電池、OUT+/OUT− 接風扇、PWM/GND 接 ESP32；模組內已含 Q1、R1、R2，D1 仍需外加。</text>
+  <rect x="40" y="840" width="1120" height="135" rx="10" fill="#fffaf0" stroke="#c9a227" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="60" y="870" class="s16 b">接線重點</text>
+  <text x="60" y="897" class="s14">① 電池調速固定在最高段，轉速由 ESP32 的 PWM 控制。　② 所有 GND 必須共地：ESP32、Q1、Q2、電池 DC− 接在一起。</text>
+  <text x="60" y="922" class="s14">③ 腳位與 fan_vest.ino 一致：GPIO25／26 = 前胸／後背 PWM、GPIO4 = DHT11、GPIO21／22 = INA219、GPIO14 = 蜂鳴器、GPIO32 = 燈、GPIO33 = 按鈕。</text>
+  <text x="60" y="947" class="s14">④ 四顆風扇用 DC 一分二線分成前胸、後背兩組；每組一個 D4184 和一顆 1N5819。　⑤ 沒接 INA219、蜂鳴器或燈也能運作。</text>
 </svg>
