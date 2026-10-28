@@ -137,6 +137,7 @@
       [t('diagLearn'), on ? `${x.learnShift >= 0 ? '+' : ''}${x.learnShift.toFixed(1)}°C (${x.learnCount})` : '—'],
       [t('diagUptime'), on ? `${s.uptime} min` : '—'],
     ];
+    if (on && !x.has && x.err) rows.push([t('diagError'), x.err]);
     const dl = $('diagList');
     dl.textContent = '';
     for (const [k, v] of rows) {

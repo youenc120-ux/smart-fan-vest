@@ -163,6 +163,7 @@ window.I18N = (() => {
       teamFan: "風速",
       teamBattery: "電量",
       diagNoExtra: '手機沒有讀到新版韌體的進階資料，可能是記住了舊的藍牙資料。請到手機的藍牙設定把 FanVest 取消配對，關閉再開啟藍牙，然後重新連線。',
+      diagError: '讀取錯誤',
       demoFoot: '示範模式：資料為模擬，時間加速播放。',
     },
     en: {
@@ -327,6 +328,7 @@ window.I18N = (() => {
       teamFan: "Fans",
       teamBattery: "Battery",
       diagNoExtra: "Your phone didn't read the new firmware's extra data, probably because it remembers the old Bluetooth layout. In your phone's Bluetooth settings, unpair FanVest, turn Bluetooth off and on, then reconnect.",
+      diagError: 'Read error',
       demoFoot: 'Demo mode: simulated data, time sped up.',
     },
   };

@@ -93,8 +93,12 @@
       extraChar.addEventListener('characteristicvaluechanged', e => parseExtra(e.target.value));
       await extraChar.startNotifications();
       parseExtra(await extraChar.readValue());
-    } catch (_) {
+    } catch (err) {
       state.extra.has = false;
+      // 記下原因與手機實際看到的特徵值，顯示在「診斷」方便除錯
+      let found = '';
+      try { found = (await svc.getCharacteristics()).map(c => c.uuid.slice(4, 8)).join(' '); } catch (_) { /* 略過 */ }
+      state.extra.err = `${err.name}: ${err.message}${found ? ` [${found}]` : ''}`;
     }
     state.deviceName = device.name || '';
     setLink('connected');

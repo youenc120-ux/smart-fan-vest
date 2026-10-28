@@ -627,7 +627,7 @@ void setupBle() {
 
   BLEServer* server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
-  BLEService* service = server->createService(SERVICE_UUID);
+  BLEService* service = server->createService(SERVICE_UUID);  // 預設 15 個屬性，目前用 13 個；再加特徵值要調大
 
   statusChar = service->createCharacteristic(
       STATUS_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
