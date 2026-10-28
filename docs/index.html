@@ -27,7 +27,7 @@
 <main>
   <section class="panel connect" id="connectPanel" aria-labelledby="connectTitle">
     <h2 id="connectTitle">連線到背心</h2>
-    <p id="connectText">打開背心電源與手機藍牙，再點下方按鈕，從清單選擇「FanVest」。第一次連線時手機會要求輸入配對碼（預設 123456）。</p>
+    <p id="connectText">打開背心電源與手機藍牙，再點下面的按鈕，從清單選擇「FanVest」。第一次連線時手機會要求輸入配對碼（預設 123456）。</p>
     <div class="notice err" id="unsupported" hidden>
       <p>這個瀏覽器不支援藍牙網頁連線。Android 請用 Chrome 開啟本頁；iPhone 請改用 Bluefy 瀏覽器。</p>
     </div>
@@ -60,8 +60,8 @@
       </div>
       <div class="g-fan">
         <svg class="fan-icon" id="fanIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c3 0 4.5 2.4 3.8 4.8-.5 1.7-2.2 2.6-3.8 2.7M21.5 12c0 3-2.4 4.5-4.8 3.8-1.7-.5-2.6-2.2-2.7-3.8M12 21.5c-3 0-4.5-2.4-3.8-4.8.5-1.7 2.2-2.6 3.8-2.7M2.5 12c0-3 2.4-4.5 4.8-3.8 1.7.5 2.6 2.2 2.7 3.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>
-        <span>前</span><strong><span id="pctFront">—</span>%</strong>
-        <span>後</span><strong><span id="pctBack">—</span>%</strong>
+        <span>上</span><strong><span id="pctUpper">—</span>%</strong>
+        <span>下</span><strong><span id="pctLower">—</span>%</strong>
       </div>
     </div>
     <div class="stats">
@@ -78,10 +78,10 @@
       <button type="button" id="modeAuto" aria-pressed="true" disabled>自動</button>
       <button type="button" id="modeManual" aria-pressed="false" disabled>手動</button>
     </div>
-    <div class="slider-head"><label for="sliderFront">前胸風速</label><output id="outFront" for="sliderFront">50%</output></div>
-    <input type="range" id="sliderFront" min="0" max="100" step="5" value="50" disabled>
-    <div class="slider-head"><label for="sliderBack">後背風速</label><output id="outBack" for="sliderBack">50%</output></div>
-    <input type="range" id="sliderBack" min="0" max="100" step="5" value="50" disabled>
+    <div class="slider-head"><label for="sliderUpper">上方風速</label><output id="outUpper" for="sliderUpper">50%</output></div>
+    <input type="range" id="sliderUpper" min="0" max="100" step="5" value="50" disabled>
+    <div class="slider-head"><label for="sliderLower">下方風速</label><output id="outLower" for="sliderLower">50%</output></div>
+    <input type="range" id="sliderLower" min="0" max="100" step="5" value="50" disabled>
     <p class="slider-note" id="sliderNote">切換到手動模式後可以拖曳調整。</p>
   </section>
 
@@ -125,7 +125,7 @@
       <div class="field"><label for="setT0">停止溫度</label><span><input type="number" id="setT0" step="0.5" min="15" max="43" inputmode="decimal"> °C</span></div>
       <div class="field"><label for="setT2">全速溫度</label><span><input type="number" id="setT2" step="0.5" min="17" max="45" inputmode="decimal"> °C</span></div>
       <div class="field"><label for="setHeat">中暑警示（體感）</label><span><input type="number" id="setHeat" step="0.5" min="30" max="55" inputmode="decimal"> °C</span></div>
-      <div class="slider-head"><label for="setBoost">自動模式後背加強</label><output id="outBoost" for="setBoost">10%</output></div>
+      <div class="slider-head"><label for="setBoost">自動模式下方加強</label><output id="outBoost" for="setBoost">10%</output></div>
       <input type="range" id="setBoost" min="0" max="50" step="5" value="10">
       <label class="toggle"><input type="checkbox" id="setFeels"><span>依體感溫度控制（考慮濕度，悶熱時吹更強）</span></label>
       <label class="toggle"><input type="checkbox" id="setBuzzer"><span>蜂鳴器提醒</span></label>

@@ -5,7 +5,7 @@
 // 手機控制頁：用 Android Chrome 開啟 GitHub Pages 上的 docs/index.html
 //
 // 接線：
-//   GPIO25 -> 前胸 D4184 PWM、GPIO26 -> 後背 D4184 PWM（兩個模組 GND 都接 ESP32 GND）
+//   GPIO25 -> 上方 D4184 PWM、GPIO26 -> 下方 D4184 PWM（兩個模組 GND 都接 ESP32 GND）
 //   GPIO4  -> DHT11 DATA（模組版已內建上拉；裸元件 DATA 與 3.3V 之間接 10kΩ）
 //   GPIO21/22 -> INA219 SDA/SCL（VIN+ 接保險絲後的 +12V，VIN- 接風扇正極）
 //   GPIO14 -> 主動式蜂鳴器、GPIO32 -> WS2812B DIN、GPIO33 -> 按鈕（另一端接 GND）
@@ -16,13 +16,13 @@
 // BLE 資料格式（皆為 little-endian；第一次連線要輸入配對碼 BLE_PIN）：
 //   STATUS   （讀取／通知，20 bytes）
 //     0  int16  溫度×10（-32768 = 感測器異常）     2  uint8  濕度%（255 = 無資料）
-//     3  int16  體感溫度×10（-32768 = 無資料）     5  uint8  前胸轉速%     6  uint8  後背轉速%
-//     7  uint8  自動模式(1/0)                       8  uint8  手動前胸%      9  uint8  手動後背%
+//     3  int16  體感溫度×10（-32768 = 無資料）     5  uint8  上方轉速%     6  uint8  下方轉速%
+//     7  uint8  自動模式(1/0)                       8  uint8  手動上方%      9  uint8  手動下方%
 //     10 uint16 電壓 mV    12 int16 電流 mA    14 uint8 電量%（255 = 無資料）    15 uint8 狀態旗標（FLAG_*）
 //     16 uint16 本次耗電 Wh×100                     18 uint16 開機分鐘數
-//   CONTROL  （寫入，3 bytes）：uint8 自動模式、uint8 手動前胸%、uint8 手動後背%（也會靜音警報、解除過電流保護）
+//   CONTROL  （寫入，3 bytes）：uint8 自動模式、uint8 手動上方%、uint8 手動下方%（也會靜音警報、解除過電流保護）
 //   SETTINGS （讀取／寫入，11 bytes，存在 ESP32 記憶體，重開機不會消失）
-//     0 int16 T0 停止溫度×10   2 int16 T1 啟動溫度×10   4 int16 T2 全速溫度×10   6 uint8 後背加強%
+//     0 int16 T0 停止溫度×10   2 int16 T1 啟動溫度×10   4 int16 T2 全速溫度×10   6 uint8 下方加強%
 //     7 int16 中暑警示體感溫度×10   9 uint8 蜂鳴器(1/0)   10 uint8 依體感溫度控制(1/0)
 //   CONFIG   （讀取，9 bytes）：uint8 最低轉速%、uint8 故障安全轉速%、uint16 過電流門檻 mA、
 //                               uint16 電池空電壓 mV、uint16 電池滿電壓 mV、uint8 低電量轉速上限%
@@ -51,8 +51,8 @@ const uint32_t BLE_PIN = 123456;   // 配對碼，請自行修改（6 位數）
 #define SETTINGS_UUID "7a1e0005-5c2b-4f0a-9d3e-6b8f2a4c9e10"
 
 // ---- 腳位 ----
-const int PIN_FAN_FRONT = 25;
-const int PIN_FAN_BACK  = 26;
+const int PIN_FAN_UPPER = 25;
+const int PIN_FAN_LOWER  = 26;
 const int PIN_DHT       = 4;
 const int PIN_SDA       = 21;
 const int PIN_SCL       = 22;
@@ -100,7 +100,7 @@ struct Settings {
   float t0 = 26.0;         // 低於此溫度停止（DHT11 解析度 1°C，遲滯區至少留 2°C）
   float t1 = 28.0;         // 高於此溫度啟動
   float t2 = 35.0;         // 高於此溫度全速
-  int backBoost = 10;      // 自動模式下後背比前胸多吹幾 %
+  int lowerBoost = 10;      // 自動模式時，下方比上方多吹幾 %
   float heatAlert = 40.0;  // 體感溫度達此值發出中暑警示
   bool buzzer = true;
   bool useFeels = true;    // true = 依體感溫度控制，false = 依空氣溫度
@@ -115,8 +115,8 @@ BLECharacteristic* settingsChar;
 
 Settings cfg;
 bool autoMode = true;
-int manualFront = 50, manualBack = 50;
-int pctFront = 0, pctBack = 0;
+int manualUpper = 50, manualLower = 50;
+int pctUpper = 0, pctLower = 0;
 bool autoFanOn = false;
 bool clientConnected = false;
 volatile bool controlChanged = false, settingsChanged = false;
@@ -179,13 +179,13 @@ void loadSettings() {
   cfg.t0 = prefs.getFloat("t0", cfg.t0);
   cfg.t1 = prefs.getFloat("t1", cfg.t1);
   cfg.t2 = prefs.getFloat("t2", cfg.t2);
-  cfg.backBoost = prefs.getInt("boost", cfg.backBoost);
+  cfg.lowerBoost = prefs.getInt("boost", cfg.lowerBoost);
   cfg.heatAlert = prefs.getFloat("heat", cfg.heatAlert);
   cfg.buzzer = prefs.getBool("buzzer", cfg.buzzer);
   cfg.useFeels = prefs.getBool("feels", cfg.useFeels);
   autoMode = prefs.getBool("auto", autoMode);
-  manualFront = prefs.getInt("mf", manualFront);
-  manualBack = prefs.getInt("mb", manualBack);
+  manualUpper = prefs.getInt("mf", manualUpper);
+  manualLower = prefs.getInt("mb", manualLower);
 }
 
 void markDirty() {
@@ -199,13 +199,13 @@ void savePrefsIfDue() {
   prefs.putFloat("t0", cfg.t0);
   prefs.putFloat("t1", cfg.t1);
   prefs.putFloat("t2", cfg.t2);
-  prefs.putInt("boost", cfg.backBoost);
+  prefs.putInt("boost", cfg.lowerBoost);
   prefs.putFloat("heat", cfg.heatAlert);
   prefs.putBool("buzzer", cfg.buzzer);
   prefs.putBool("feels", cfg.useFeels);
   prefs.putBool("auto", autoMode);
-  prefs.putInt("mf", manualFront);
-  prefs.putInt("mb", manualBack);
+  prefs.putInt("mf", manualUpper);
+  prefs.putInt("mb", manualLower);
 }
 
 // ---------- 溫濕度 ----------
@@ -256,30 +256,30 @@ int limitPct(int pct) {
 }
 
 void applyFans() {
-  int front, back;
+  int upper, lower;
   if (autoMode) {
-    front = autoPercent(controlTemp());
-    back = front > 0 ? min(100, front + cfg.backBoost) : 0;
+    upper = autoPercent(controlTemp());
+    lower = upper > 0 ? min(100, upper + cfg.lowerBoost) : 0;
   } else {
-    front = manualFront;
-    back = manualBack;
+    upper = manualUpper;
+    lower = manualLower;
   }
-  front = limitPct(front);
-  back = limitPct(back);
+  upper = limitPct(upper);
+  lower = limitPct(lower);
   unsigned long now = millis();
-  if (front > 0 && pctFront == 0) kickUntil[0] = now + KICK_MS;
-  if (back > 0 && pctBack == 0) kickUntil[1] = now + KICK_MS;
-  if ((front > 0 || back > 0) && pctFront == 0 && pctBack == 0) fanOnSince = now;
-  pctFront = front;
-  pctBack = back;
+  if (upper > 0 && pctUpper == 0) kickUntil[0] = now + KICK_MS;
+  if (lower > 0 && pctLower == 0) kickUntil[1] = now + KICK_MS;
+  if ((upper > 0 || lower > 0) && pctUpper == 0 && pctLower == 0) fanOnSince = now;
+  pctUpper = upper;
+  pctLower = lower;
 }
 
 void writeFans() {
   unsigned long now = millis();
-  int f = now < kickUntil[0] ? 100 : pctFront;
-  int b = now < kickUntil[1] ? 100 : pctBack;
-  ledcWrite(PIN_FAN_FRONT, f * 255 / 100);
-  ledcWrite(PIN_FAN_BACK, b * 255 / 100);
+  int f = now < kickUntil[0] ? 100 : pctUpper;
+  int b = now < kickUntil[1] ? 100 : pctLower;
+  ledcWrite(PIN_FAN_UPPER, f * 255 / 100);
+  ledcWrite(PIN_FAN_LOWER, b * 255 / 100);
 }
 
 // ---------- 電源 ----------
@@ -315,7 +315,7 @@ void updatePowerAverage() {
   samples = 0;
   energyWh += busMv / 1000 * max(0.0f, currentMa) / 1000 / 3600;  // 每秒累加一次
 
-  fanLowCurrent = max(pctFront, pctBack) >= FAN_CHECK_PCT && millis() - fanOnSince >= FAN_CHECK_DELAY_MS &&
+  fanLowCurrent = max(pctUpper, pctLower) >= FAN_CHECK_PCT && millis() - fanOnSince >= FAN_CHECK_DELAY_MS &&
                   currentMa < FAN_MIN_MA;
 
   batteryPct = constrain(map((long)busMv, BATT_EMPTY_MV, BATT_FULL_MV, 0, 100), 0, 100);
@@ -381,7 +381,7 @@ void handleButtonAction(bool longPress) {
       autoFanOn = false;
       step = -1;
     }
-    if (!autoMode) manualFront = manualBack = STEPS[step];
+    if (!autoMode) manualUpper = manualLower = STEPS[step];
     beep(BEEP_CHIRP, 1);
     markDirty();
   }
@@ -437,11 +437,11 @@ void publishStatus() {
   putInt16(b, tenths(tempC));
   b[2] = isnan(humidity) ? 255 : (uint8_t)lroundf(humidity);
   putInt16(b + 3, tenths(feelsC));
-  b[5] = pctFront;
-  b[6] = pctBack;
+  b[5] = pctUpper;
+  b[6] = pctLower;
   b[7] = autoMode ? 1 : 0;
-  b[8] = manualFront;
-  b[9] = manualBack;
+  b[8] = manualUpper;
+  b[9] = manualLower;
   putInt16(b + 10, (int16_t)constrain(lroundf(busMv), 0, 65535));  // uint16，以 int16 寫入相同位元
   putInt16(b + 12, (int16_t)constrain(lroundf(currentMa), -32768, 32767));
   b[14] = inaFound && batteryPct >= 0 ? batteryPct : 255;
@@ -457,7 +457,7 @@ void publishSettings() {
   putInt16(b, tenths(cfg.t0));
   putInt16(b + 2, tenths(cfg.t1));
   putInt16(b + 4, tenths(cfg.t2));
-  b[6] = cfg.backBoost;
+  b[6] = cfg.lowerBoost;
   putInt16(b + 7, tenths(cfg.heatAlert));
   b[9] = cfg.buzzer ? 1 : 0;
   b[10] = cfg.useFeels ? 1 : 0;
@@ -479,8 +479,8 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
     bool newAuto = v[0] != 0;
     if (newAuto != autoMode) autoFanOn = false;  // 切換模式時重新判斷遲滯狀態
     autoMode = newAuto;
-    manualFront = constrain((uint8_t)v[1], 0, 100);
-    manualBack = constrain((uint8_t)v[2], 0, 100);
+    manualUpper = constrain((uint8_t)v[1], 0, 100);
+    manualLower = constrain((uint8_t)v[2], 0, 100);
     controlChanged = true;  // 交給 loop() 處理，避免在 BLE 執行緒裡做太多事
   }
 };
@@ -497,7 +497,7 @@ class SettingsCallbacks : public BLECharacteristicCallbacks {
       cfg.t0 = t0;
       cfg.t1 = t1;
       cfg.t2 = t2;
-      cfg.backBoost = b[6];
+      cfg.lowerBoost = b[6];
       cfg.heatAlert = heat;
       cfg.buzzer = b[9] != 0;
       cfg.useFeels = b[10] != 0;
@@ -560,10 +560,10 @@ void setupBle() {
 void setup() {
   Serial.begin(115200);
 
-  ledcAttach(PIN_FAN_FRONT, PWM_FREQ, PWM_RES);
-  ledcAttach(PIN_FAN_BACK, PWM_FREQ, PWM_RES);
-  ledcWrite(PIN_FAN_FRONT, 0);
-  ledcWrite(PIN_FAN_BACK, 0);
+  ledcAttach(PIN_FAN_UPPER, PWM_FREQ, PWM_RES);
+  ledcAttach(PIN_FAN_LOWER, PWM_FREQ, PWM_RES);
+  ledcWrite(PIN_FAN_UPPER, 0);
+  ledcWrite(PIN_FAN_LOWER, 0);
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
@@ -612,8 +612,8 @@ void loop() {
     updateHeatAlert();
     applyFans();
     publishStatus();
-    Serial.printf("T=%.1f H=%.0f feels=%.1f front=%d back=%d auto=%d V=%.2f I=%.0fmA batt=%d flags=0x%02X\n",
-                  tempC, humidity, feelsC, pctFront, pctBack, autoMode, busMv / 1000, currentMa, batteryPct,
+    Serial.printf("T=%.1f H=%.0f feels=%.1f upper=%d lower=%d auto=%d V=%.2f I=%.0fmA batt=%d flags=0x%02X\n",
+                  tempC, humidity, feelsC, pctUpper, pctLower, autoMode, busMv / 1000, currentMa, batteryPct,
                   statusFlags());
   }
 

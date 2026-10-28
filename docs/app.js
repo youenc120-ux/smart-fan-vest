@@ -18,12 +18,12 @@
     const hum = dv.getUint8(2);
     state.hum = hum === 255 ? null : hum;
     state.feels = t10(dv.getInt16(3, true));
-    state.front = dv.getUint8(5);
-    state.back = dv.getUint8(6);
+    state.upper = dv.getUint8(5);
+    state.lower = dv.getUint8(6);
     state.auto = dv.getUint8(7) === 1;
     if (!state.dragging) {
-      state.manualFront = dv.getUint8(8);
-      state.manualBack = dv.getUint8(9);
+      state.manualUpper = dv.getUint8(8);
+      state.manualLower = dv.getUint8(9);
     }
     state.mv = dv.getUint16(10, true);
     state.ma = dv.getInt16(12, true);
@@ -121,7 +121,7 @@
 
   function sendControl() {
     if (demo) demoApply();
-    return write(controlChar, new Uint8Array([state.auto ? 1 : 0, state.manualFront, state.manualBack]), '指令');
+    return write(controlChar, new Uint8Array([state.auto ? 1 : 0, state.manualUpper, state.manualLower]), '指令');
   }
 
   // ---------- 螢幕保持亮著（避免手機休眠時藍牙斷線） ----------
@@ -207,9 +207,9 @@
     const auto = !demoFanOn ? 0 : t >= t2 ? 100 : Math.max(dmin, Math.round(dmin + (t - t1) / (t2 - t1) * (100 - dmin)));
     const low = state.batt < 20;
     const lim = p => { p = low ? Math.min(p, lowCap) : p; return p > 0 && p < dmin ? dmin : p; };
-    state.front = lim(state.auto ? auto : state.manualFront);
-    state.back = lim(state.auto ? (auto ? Math.min(100, auto + boost) : 0) : state.manualBack);
-    state.ma = 3 + (state.front + state.back) * 8 + (Math.random() - .5) * 30;
+    state.upper = lim(state.auto ? auto : state.manualUpper);
+    state.lower = lim(state.auto ? (auto ? Math.min(100, auto + boost) : 0) : state.manualLower);
+    state.ma = 3 + (state.upper + state.lower) * 8 + (Math.random() - .5) * 30;
     state.mv = 10200 + state.batt / 100 * 2400 - state.ma * .3;
     let f = 0;
     if (state.feels >= heat) f |= FLAG.HEAT;
@@ -253,7 +253,7 @@
   });
 
   let sendTimer = null;
-  for (const [slider, out, key] of [[ui.sliderFront, ui.outFront, 'manualFront'], [ui.sliderBack, ui.outBack, 'manualBack']]) {
+  for (const [slider, out, key] of [[ui.sliderUpper, ui.outUpper, 'manualUpper'], [ui.sliderLower, ui.outLower, 'manualLower']]) {
     slider.addEventListener('pointerdown', () => { state.dragging = true; });
     slider.addEventListener('input', () => {
       state[key] = Number(slider.value);
@@ -277,7 +277,7 @@
     ui.connectBtn.disabled = true;
     ui.connectText.hidden = true;
   }
-  if (demo) ui.connectText.textContent = '示範模式：點下方按鈕，用模擬資料預覽介面。';
+  if (demo) ui.connectText.textContent = '示範模式：點下面的按鈕，用模擬資料預覽介面。';
 
   buildCurve();
   fillSettingsForm();

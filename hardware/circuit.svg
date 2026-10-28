@@ -63,7 +63,7 @@
   <text x="551" y="235" class="s13">SCL</text>
   <text x="510" y="200" text-anchor="end" class="s13">VCC 接 3V3、GND 共地</text>
 
-  <!-- 前胸：風扇 1、2，D1，Q1 -->
+  <!-- 上方：風扇 1、2，D1，Q1 -->
   <use href="#fan" x="760" y="200"/>
   <use href="#fan" x="840" y="200"/>
   <text x="760" y="288" text-anchor="middle" class="s13">風扇1</text>
@@ -72,9 +72,9 @@
   <path d="M700 360 H840" class="w sw"/>
   <use href="#diode" x="700" y="232"/>
   <text x="690" y="285" text-anchor="end" class="s13">D1</text>
-  <text x="800" y="388" text-anchor="middle" class="s14 b">前胸</text>
+  <text x="800" y="388" text-anchor="middle" class="s14 b">上方</text>
 
-  <!-- 後背：風扇 3、4，D2，Q2 -->
+  <!-- 下方：風扇 3、4，D2，Q2 -->
   <use href="#fan" x="1000" y="200"/>
   <use href="#fan" x="1080" y="200"/>
   <text x="1000" y="288" text-anchor="middle" class="s13">風扇3</text>
@@ -84,7 +84,7 @@
   <path d="M940 360 H1080" class="w sw"/>
   <use href="#diode" x="940" y="232"/>
   <text x="930" y="285" text-anchor="end" class="s13">D2</text>
-  <text x="1040" y="388" text-anchor="middle" class="s14 b">後背</text>
+  <text x="1040" y="388" text-anchor="middle" class="s14 b">下方</text>
 
   <g>
     <circle cx="700" cy="150" r="5" class="dot"/><circle cx="760" cy="150" r="5" class="dot"/><circle cx="840" cy="150" r="5" class="dot"/>
@@ -97,12 +97,12 @@
   <path d="M700 360 V420" class="w sw"/>
   <rect x="650" y="420" width="100" height="60" rx="6" fill="#f3e5f5" stroke="#333" stroke-width="2"/>
   <text x="700" y="446" text-anchor="middle" class="s14 b">Q1 D4184</text>
-  <text x="700" y="466" text-anchor="middle" class="s13">前胸</text>
+  <text x="700" y="466" text-anchor="middle" class="s13">上方</text>
   <path d="M700 480 V495" class="w gnd"/><use href="#gnd" x="700" y="495"/>
   <path d="M940 360 V420" class="w sw"/>
   <rect x="890" y="420" width="100" height="60" rx="6" fill="#f3e5f5" stroke="#333" stroke-width="2"/>
   <text x="940" y="446" text-anchor="middle" class="s14 b">Q2 D4184</text>
-  <text x="940" y="466" text-anchor="middle" class="s13">後背</text>
+  <text x="940" y="466" text-anchor="middle" class="s13">下方</text>
   <path d="M940 480 V495" class="w gnd"/><use href="#gnd" x="940" y="495"/>
   <text x="1005" y="436" class="s13">D4184 實際接法：</text>
   <text x="1005" y="454" class="s13">VIN± 接電池、OUT± 接</text>
@@ -179,6 +179,6 @@
   <rect x="40" y="840" width="1120" height="135" rx="10" fill="#fffaf0" stroke="#c9a227" stroke-width="2" stroke-dasharray="8 5"/>
   <text x="60" y="870" class="s16 b">接線重點</text>
   <text x="60" y="897" class="s14">① 電池調速固定在最高段，轉速由 ESP32 的 PWM 控制。　② 所有 GND 必須共地：ESP32、Q1、Q2、電池 DC− 接在一起。</text>
-  <text x="60" y="922" class="s14">③ 腳位與 fan_vest.ino 一致：GPIO25／26 = 前胸／後背 PWM、GPIO4 = DHT11、GPIO21／22 = INA219、GPIO14 = 蜂鳴器、GPIO32 = 燈、GPIO33 = 按鈕。</text>
-  <text x="60" y="947" class="s14">④ 四顆風扇用 DC 一分二線分成前胸、後背兩組；每組一個 D4184 和一顆 1N5819。　⑤ 沒接 INA219、蜂鳴器或燈也能運作。</text>
+  <text x="60" y="922" class="s14">③ 腳位與 fan_vest.ino 一致：GPIO25／26 = 上方／下方 PWM、GPIO4 = DHT11、GPIO21／22 = INA219、GPIO14 = 蜂鳴器、GPIO32 = 燈、GPIO33 = 按鈕。</text>
+  <text x="60" y="947" class="s14">④ 四顆風扇用 DC 一分二線分成上方、下方兩組；每組一個 D4184 和一顆 1N5819。　⑤ 沒接 INA219、蜂鳴器或燈也能運作。</text>
 </svg>

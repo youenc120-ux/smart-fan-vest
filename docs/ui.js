@@ -3,8 +3,8 @@ window.FV = (() => {
   const $ = id => document.getElementById(id);
   const ids = ['link', 'linkText', 'connectPanel', 'connectText', 'connectBtn', 'connectBtnText', 'unsupported',
     'connectError', 'connectErrorText', 'heatAlert', 'heatAlertTitle', 'heatAlertText', 'muteBtn', 'arc', 'temp',
-    'level', 'pctFront', 'pctBack', 'fanIcon', 'hum', 'feels', 'sensorError', 'sensorErrorText', 'hint',
-    'modeAuto', 'modeManual', 'sliderFront', 'sliderBack', 'outFront', 'outBack', 'sliderNote',
+    'level', 'pctUpper', 'pctLower', 'fanIcon', 'hum', 'feels', 'sensorError', 'sensorErrorText', 'hint',
+    'modeAuto', 'modeManual', 'sliderUpper', 'sliderLower', 'outUpper', 'outLower', 'sliderNote',
     'battPct', 'battFill', 'amps', 'volts', 'watts', 'usage', 'powerGrid', 'powerNote', 'overcurrent',
     'overcurrentText', 'fanLow', 'fanLowText', 'lowBatt', 'lowBattText', 'historyChart', 'historyNote',
     'chart', 'curveSub', 'settingsForm', 'setT0', 'setT1', 'setT2', 'setHeat', 'setBoost', 'outBoost',
@@ -18,7 +18,7 @@ window.FV = (() => {
   const state = {
     link: 'idle',  // idle | connecting | connected | lost
     temp: null, hum: null, feels: null,
-    front: null, back: null, auto: true, manualFront: 50, manualBack: 50,
+    upper: null, lower: null, auto: true, manualUpper: 50, manualLower: 50,
     mv: null, ma: null, batt: null, flags: FLAG.POWER_MISSING, wh: 0, uptime: 0,
     cfg: { dmin: 30, fail: 70, ocMa: 3000, emptyMv: 10200, fullMv: 12600, lowCap: 70 },
     set: { t0: 26, t1: 28, t2: 35, boost: 10, heat: 40, buzzer: true, useFeels: true },
@@ -79,10 +79,10 @@ window.FV = (() => {
     const { path, manualLine, marker, guide } = curve, on = live(), t = ctrlTemp();
     path.classList.toggle('dim', on && !state.auto);
     manualLine.setAttribute('opacity', on && !state.auto ? 1 : 0);
-    manualLine.setAttribute('y1', sy(state.manualFront));
-    manualLine.setAttribute('y2', sy(state.manualFront));
-    if (on && t !== null && state.front !== null) {
-      const x = sx(t), y = sy(state.front);
+    manualLine.setAttribute('y1', sy(state.manualUpper));
+    manualLine.setAttribute('y2', sy(state.manualUpper));
+    if (on && t !== null && state.upper !== null) {
+      const x = sx(t), y = sy(state.upper);
       marker.setAttribute('opacity', 1);
       marker.style.transform = `translate(${x}px, ${y}px)`;
       guide.setAttribute('y2', C.y0 - y);
@@ -91,8 +91,8 @@ window.FV = (() => {
     }
     const basis = state.set.useFeels ? '體感溫度' : '溫度';
     ui.curveSub.textContent = state.auto || !on
-      ? `橫軸是${basis}，圓點是前胸目前的位置；後背會再加強 ${state.set.boost}%。藍色區是遲滯區：風扇轉動後要降到 ${state.set.t0}°C 以下才停。`
-      : '手動模式中，虛線是你設定的前胸風速；曲線僅供參考。';
+      ? `橫軸是${basis}，圓點是上方目前的位置；下方會再加強 ${state.set.boost}%。藍色區是遲滯區：風扇轉動後要降到 ${state.set.t0}°C 以下才停。`
+      : '手動模式中，虛線是你設定的上方風速；曲線僅供參考。';
   }
 
   // ---------- 最近 10 分鐘 ----------
@@ -100,7 +100,7 @@ window.FV = (() => {
   function pushHistory() {
     const now = Date.now(), h = state.history;
     if (h.length && now - h[h.length - 1].t < 900) return;
-    h.push({ t: now, temp: state.temp, feels: state.feels, pct: Math.max(state.front || 0, state.back || 0) });
+    h.push({ t: now, temp: state.temp, feels: state.feels, pct: Math.max(state.upper || 0, state.lower || 0) });
     while (h.length && now - h[0].t > H.span) h.shift();
   }
 
@@ -144,16 +144,16 @@ window.FV = (() => {
     ui.connectBtn.disabled = s.link === 'connecting' || s.link === 'lost';
     ui.connectBtnText.textContent = s.link === 'connecting' ? '連線中…' : s.link === 'lost' ? '重新連線中…' : '連線裝置';
 
-    // 儀表：圓環 = 前後較快的一區，顏色 = 控制溫度等級
+    // 儀表：圓環 = 上下較快的一區，顏色 = 控制溫度等級
     const t = on ? ctrlTemp() : null, lv = level(t);
-    const pct = on ? Math.max(s.front || 0, s.back || 0) : 0;
+    const pct = on ? Math.max(s.upper || 0, s.lower || 0) : 0;
     document.documentElement.style.setProperty('--tc', lv.color);
     ui.arc.setAttribute('stroke-dasharray', `${pct} 100`);
     ui.arc.style.opacity = pct > 0 ? 1 : 0;
     ui.temp.textContent = on && s.temp !== null ? fmt1(s.temp) : '—';
     ui.level.textContent = lv.text;
-    ui.pctFront.textContent = on && s.front !== null ? s.front : '—';
-    ui.pctBack.textContent = on && s.back !== null ? s.back : '—';
+    ui.pctUpper.textContent = on && s.upper !== null ? s.upper : '—';
+    ui.pctLower.textContent = on && s.lower !== null ? s.lower : '—';
     ui.hum.textContent = on && s.hum !== null ? s.hum : '—';
     ui.feels.textContent = on && s.feels !== null ? fmt1(s.feels) : '—';
     ui.fanIcon.style.animationDuration = pct > 0 ? (1.8 - pct / 100 * 1.5).toFixed(2) + 's' : '1s';
@@ -175,13 +175,13 @@ window.FV = (() => {
     ui.modeAuto.disabled = ui.modeManual.disabled = !on;
     ui.modeAuto.setAttribute('aria-pressed', s.auto);
     ui.modeManual.setAttribute('aria-pressed', !s.auto);
-    for (const [slider, out, v] of [[ui.sliderFront, ui.outFront, s.manualFront], [ui.sliderBack, ui.outBack, s.manualBack]]) {
+    for (const [slider, out, v] of [[ui.sliderUpper, ui.outUpper, s.manualUpper], [ui.sliderLower, ui.outLower, s.manualLower]]) {
       slider.disabled = !on || s.auto;
       if (!s.dragging) { slider.value = v; out.textContent = v + '%'; }
       sliderFill(slider);
     }
     ui.sliderNote.textContent = !on ? '連線後可以使用。'
-      : s.auto ? `自動模式下後背比前胸多吹 ${s.set.boost}%，可在「設定」調整。`
+      : s.auto ? `自動模式時，下方比上方多吹 ${s.set.boost}%，可在「設定」調整。`
       : `低於 ${s.cfg.dmin}% 時風扇可能轉不動，會自動提高到 ${s.cfg.dmin}%；拉到 0 為停止。`;
 
     renderPower(on);
