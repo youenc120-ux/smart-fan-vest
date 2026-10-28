@@ -90,7 +90,7 @@ window.I18N = (() => {
       profileNote2: "運動：26°C 開始送風、32°C 全速，下方加強 20%，反應最快。",
       profileNote3: "安靜：最高風速 40%，蜂鳴器關閉，適合辦公室或休息。",
       profileNote4: "省電：最高風速 60%，門檻較高，延長電池使用時間。",
-      profileOldFw: "請更新韌體到 1.0 以上才能使用情境模式。",
+      profileOldFw: "可以切換情境模式，但手機讀不到目前的模式；請看「診斷」裡的說明。",
       runtimeLabel: "預估還能用",
       capacityLabel: "電池容量",
       runtimeNote: "依目前耗電 {w} W 估算；容量請看電池標示（mAh × 電壓 ÷ 1000 = Wh）。",
@@ -162,6 +162,7 @@ window.I18N = (() => {
       teamRemove: "移除",
       teamFan: "風速",
       teamBattery: "電量",
+      diagNoExtra: '手機沒有讀到新版韌體的進階資料，可能是記住了舊的藍牙資料。請到手機的藍牙設定把 FanVest 取消配對，關閉再開啟藍牙，然後重新連線。',
       demoFoot: '示範模式：資料為模擬，時間加速播放。',
     },
     en: {
@@ -253,7 +254,7 @@ window.I18N = (() => {
       profileNote2: "Sport: fans start at 26°C, full speed at 32°C, lower fans +20%. Fastest response.",
       profileNote3: "Quiet: fans capped at 40%, buzzer off. Good for offices or resting.",
       profileNote4: "Eco: fans capped at 60% with higher thresholds to make the battery last.",
-      profileOldFw: "Update the firmware to 1.0 or later to use profiles.",
+      profileOldFw: "You can switch profiles, but the phone can't read the current one. See the note under Diagnostics.",
       runtimeLabel: "Estimated time left",
       capacityLabel: "Battery capacity",
       runtimeNote: "Based on the current draw of {w} W. Capacity is on the battery label (mAh × volts ÷ 1000 = Wh).",
@@ -325,6 +326,7 @@ window.I18N = (() => {
       teamRemove: "Remove",
       teamFan: "Fans",
       teamBattery: "Battery",
+      diagNoExtra: "Your phone didn't read the new firmware's extra data, probably because it remembers the old Bluetooth layout. In your phone's Bluetooth settings, unpair FanVest, turn Bluetooth off and on, then reconnect.",
       demoFoot: 'Demo mode: simulated data, time sped up.',
     },
   };

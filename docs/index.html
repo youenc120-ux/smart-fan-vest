@@ -197,6 +197,7 @@
   <details class="panel settings" id="diagPanel">
     <summary><h2 data-i18n="diagTitle">診斷</h2><span class="slider-note" data-i18n="diagSub">韌體版本、原始數值、自我檢測、無線更新</span></summary>
     <dl class="diag" id="diagList"></dl>
+    <div class="notice warn" id="diagHint" hidden><p data-i18n="diagNoExtra">手機沒有讀到新版韌體的進階資料，可能是記住了舊的藍牙資料。請到手機的藍牙設定把 FanVest 取消配對，關閉再開啟藍牙，然後重新連線。</p></div>
     <div class="notice" id="selfTestResult" hidden><p id="selfTestText"></p></div>
     <button class="secondary" type="button" id="selfTestBtn" data-i18n="selfTestBtn" disabled>重新自我檢測</button>
     <button class="secondary" type="button" id="otaBtn" data-i18n="otaBtn" disabled>進入無線更新模式</button>

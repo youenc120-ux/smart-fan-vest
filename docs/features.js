@@ -150,9 +150,10 @@
       $('selfTestResult').className = 'notice ' + (st.cls === 'ok' ? '' : st.cls);
       $('selfTestText').textContent = st.text;
     }
-    const canCmd = on && x.has && !(s.flags & 0x01);
-    $('selfTestBtn').disabled = !canCmd || !!(x.flags & X.SELF_TEST);
-    $('otaBtn').disabled = !(on && x.has);
+    // 指令走 CONTROL 特徵值，不需要 EXTRA；只有自我檢測需要電流感測器
+    $('selfTestBtn').disabled = !on || !!(s.flags & 0x01) || !!(x.flags & X.SELF_TEST);
+    $('otaBtn').disabled = !on;
+    $('diagHint').hidden = !(on && !x.has);
   }
 
   // ---------- 每次畫面更新 ----------
@@ -173,7 +174,7 @@
 
     // 情境模式
     profileBtns.forEach(b => {
-      b.disabled = !adv;
+      b.disabled = !on;
       b.setAttribute('aria-pressed', adv && Number(b.dataset.profile) === x.profile);
     });
     $('profileNote').textContent = !adv ? (on ? t('profileOldFw') : '') : t('profileNote' + x.profile);
