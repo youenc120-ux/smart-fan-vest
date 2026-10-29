@@ -84,23 +84,16 @@
         <span data-i18n="lowerShort">下</span><strong><span id="pctLower">—</span>%</strong>
       </div>
     </div>
-    <div class="stats">
+    <div class="stats" id="readStats">
       <div><p class="p-label" data-i18n="humidity">濕度</p><p class="p-value"><span id="hum">—</span><span class="p-unit">%</span></p></div>
       <div><p class="p-label" data-i18n="feelsLike">體感溫度</p><p class="p-value"><span id="feels">—</span><span class="p-unit">°C</span></p></div>
+      <div id="hrStat" hidden><p class="p-label"><svg class="hr-icon" id="hrIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="currentColor"/></svg><span data-i18n="hrTitle">心率</span></p><p class="p-value hr-value"><span id="hrNow">—</span><span class="p-unit">bpm</span></p><p class="p-sub" id="hrPeakVal"></p></div>
     </div>
+    <p class="slider-note" id="hrNote" hidden></p>
     <div class="notice warn" id="sensorError" hidden><p id="sensorErrorText"></p></div>
     <p class="hint" id="hint">連線後會顯示即時溫度與風速。</p>
   </section>
 
-
-  <section class="panel exposure" id="hrPanel" aria-labelledby="hrTitle" hidden>
-    <h2 id="hrTitle" data-i18n="hrTitle">心率</h2>
-    <div class="stats">
-      <div><p class="p-label" data-i18n="hrNow">目前</p><p class="p-value"><span id="hrNow">—</span><span class="p-unit">bpm</span></p></div>
-      <div><p class="p-label" data-i18n="hrPeak">本次最高</p><p class="p-value"><span id="hrPeakVal">—</span><span class="p-unit">bpm</span></p></div>
-    </div>
-    <p class="slider-note" id="hrNote"></p>
-  </section>
 
   <section class="panel exposure" id="exposurePanel" aria-labelledby="exposureTitle" hidden>
     <h2 id="exposureTitle" data-i18n="exposureTitle">熱暴露</h2>
