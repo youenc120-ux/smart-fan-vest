@@ -397,6 +397,11 @@
   setInterval(() => { if (state.link === 'connected') render(); }, 5000);  // 讓歷史圖的時間軸持續往前
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // 有新版時自動換上並重新整理一次，手機不會卡在舊畫面
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController && !window.__fvReloaded) { window.__fvReloaded = true; location.reload(); }
+    });
   }
 })();
