@@ -166,19 +166,17 @@
     $('hrAlertText').textContent = t('hrAlertText');
     $('hrMuteBtn').hidden = !!(s.flags & 0x20);
 
-    // 顯示在最上方的即時讀數旁；沒接感測器就不佔位置
-    const has = on && x.has && x.hrState !== null && x.hrState !== 0;
-    $('hrStat').hidden = !has;
-    $('readStats').classList.toggle('three', has);
-    $('hrNote').hidden = !has || x.hrState === 3;
-    if (!has) return;
-    const live = x.hrState === 3;
+    // 一直顯示在最上方的即時讀數旁；沒有讀值時在下方說明原因
+    const st = !on ? null : !x.has || x.hrState === null ? 'old' : x.hrState;
+    const live = st === 3;
     $('hrNow').textContent = live ? x.bpm : '—';
-    $('hrPeakVal').textContent = x.hrPeak ? t('hrPeakShort', { bpm: x.hrPeak }) : '';
+    $('hrPeakVal').textContent = on && x.hrPeak ? t('hrPeakShort', { bpm: x.hrPeak }) : '';
     $('hrIcon').classList.toggle('beat', live);
     if (live) $('hrIcon').style.setProperty('--hr-period', (60 / x.bpm).toFixed(2) + 's');
     $('hrNow').parentElement.classList.toggle('alert', live && x.bpm >= s.set.hrHigh);
-    $('hrNote').textContent = x.hrState === 1 ? t('hrNoContact') : t('hrMeasuring');
+    const why = { old: 'hrOldFw', 0: 'hrNoSensor', 1: 'hrNoContact', 2: 'hrMeasuring' }[st];
+    $('hrNote').hidden = !why;
+    if (why) $('hrNote').textContent = t(why);
   }
 
   // ---------- 每次畫面更新 ----------
