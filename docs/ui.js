@@ -14,7 +14,7 @@ window.FV = (() => {
   const ui = Object.fromEntries(ids.map(id => [id, $(id)]));
 
   // 與韌體 FLAG_* 相同
-  const FLAG = { POWER_MISSING: 0x01, OVERCURRENT: 0x02, FAN_LOW: 0x04, HEAT: 0x08, LOW_BATT: 0x10, MUTED: 0x20 };
+  const FLAG = { POWER_MISSING: 0x01, OVERCURRENT: 0x02, FAN_LOW: 0x04, HEAT: 0x08, LOW_BATT: 0x10, MUTED: 0x20, HR: 0x40 };
 
   const state = {
     link: 'idle',  // idle | connecting | connected | lost
@@ -23,10 +23,10 @@ window.FV = (() => {
     mv: null, ma: null, batt: null, flags: FLAG.POWER_MISSING, wh: 0, uptime: 0,
     cfg: { dmin: 30, fail: 70, ocMa: 3000, emptyMv: 10200, fullMv: 12600, lowCap: 70 },
     set: { t0: 26, t1: 28, t2: 35, boost: 10, heat: 40, buzzer: true, useFeels: true,
-      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true },
+      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true, hrHigh: 150 },
     // EXTRA 特徵值（features.ino）：舊版韌體沒有，hasExtra = false
     extra: { has: false, flags: 0, hotMin: 0, totalHotMin: 0, profile: 0, stUpper: null, stLower: null,
-      fw: '', learnShift: 0, learnCount: 0 },
+      fw: '', learnShift: 0, learnCount: 0, hrState: null, bpm: 0, hrPeak: 0 },
     deviceName: '',
     dragging: false,
     history: [],  // 最近 10 分鐘：{ t, temp, feels, pct }
@@ -112,7 +112,7 @@ window.FV = (() => {
     while (h.length && now - h[0].t > H.span) h.shift();
     const s = state;
     s.log.push({ t: now, temp: s.temp, hum: s.hum, feels: s.feels, upper: s.upper, lower: s.lower, auto: s.auto,
-      mv: s.mv, ma: s.ma, batt: s.batt, flags: s.flags, profile: s.extra.profile });
+      mv: s.mv, ma: s.ma, batt: s.batt, flags: s.flags, profile: s.extra.profile, bpm: s.extra.bpm || null });
     if (s.log.length > 7200) s.log.shift();
   }
 

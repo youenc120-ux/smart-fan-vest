@@ -15,7 +15,7 @@
 
   function parseStatus(dv) {
     if (dv.byteLength < 20) return;  // 舊版韌體，請重新燒錄
-    const wasHeat = state.flags & FLAG.HEAT;
+    const wasHeat = state.flags & FLAG.HEAT, wasHr = state.flags & FLAG.HR;
     state.temp = t10(dv.getInt16(0, true));
     const hum = dv.getUint8(2);
     state.hum = hum === 255 ? null : hum;
@@ -34,7 +34,7 @@
     state.flags = dv.getUint8(15);
     state.wh = dv.getUint16(16, true) / 100;
     state.uptime = dv.getUint16(18, true);
-    onStatusUpdated(wasHeat);
+    onStatusUpdated(wasHeat, wasHr);
   }
 
   function parseConfig(dv) {
@@ -48,12 +48,13 @@
     state.set = {
       t0: dv.getInt16(0, true) / 10, t1: dv.getInt16(2, true) / 10, t2: dv.getInt16(4, true) / 10,
       boost: dv.getUint8(6), heat: dv.getInt16(7, true) / 10, buzzer: dv.getUint8(9) === 1, useFeels: dv.getUint8(10) === 1,
-      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true,
+      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true, hrHigh: 150,
     };
     if (dv.byteLength >= 16) {
       Object.assign(state.set, { maxPct: dv.getUint8(11), hydFeels: dv.getInt16(12, true) / 10,
         hydMin: dv.getUint8(14), learn: dv.getUint8(15) === 1 });
     }
+    if (dv.byteLength >= 17) state.set.hrHigh = dv.getUint8(16);
     buildCurve();
     fillSettingsForm();
   }
@@ -64,13 +65,17 @@
       has: true, flags: dv.getUint8(0), hotMin: dv.getUint16(1, true), totalHotMin: dv.getUint16(3, true),
       profile: dv.getUint8(5), stUpper: ma(dv.getUint16(6, true)), stLower: ma(dv.getUint16(8, true)),
       fw: `${dv.getUint8(10)}.${dv.getUint8(11)}`, learnShift: dv.getInt16(12, true) / 10, learnCount: dv.getUint8(14),
+      // 1.1 版起：心率（舊版韌體沒有，hrState = null）
+      hrState: dv.byteLength >= 19 ? dv.getUint8(16) : null, bpm: dv.byteLength >= 19 ? dv.getUint8(17) : 0,
+      hrPeak: dv.byteLength >= 19 ? dv.getUint8(18) : 0,
     };
     render();
   }
 
-  function onStatusUpdated(wasHeat) {
+  function onStatusUpdated(wasHeat, wasHr) {
     // 中暑警示剛出現時讓手機震動（代替震動馬達，需要網頁在前景）
     if ((state.flags & FLAG.HEAT) && !wasHeat && navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+    if ((state.flags & FLAG.HR) && !wasHr && navigator.vibrate) navigator.vibrate([150, 100, 150, 100, 150, 100, 400]);
     pushHistory();
     render();
   }
@@ -200,14 +205,15 @@
 
     const g = id => document.getElementById(id);
     Object.assign(s, { maxPct: Number(g('setMax').value), hydFeels: n(g('setHydFeels')),
-      hydMin: Math.round(n(g('setHydMin'))), learn: g('setLearn').checked });
+      hydMin: Math.round(n(g('setHydMin'))), learn: g('setLearn').checked, hrHigh: Math.round(n(g('setHrHigh'))) });
     if (Number.isNaN(s.hydFeels) || s.hydFeels < 25 || s.hydFeels > 45) err = t('errHydFeels');
     else if (Number.isNaN(s.hydMin) || s.hydMin < 5 || s.hydMin > 120) err = t('errHydMin');
+    else if (Number.isNaN(s.hrHigh) || s.hrHigh < 100 || s.hrHigh > 220) err = t('errHrHigh');
     ui.settingsError.hidden = !err;
     ui.settingsErrorText.textContent = err;
     if (err) return;
 
-    const b = new DataView(new ArrayBuffer(16));
+    const b = new DataView(new ArrayBuffer(17));
     b.setInt16(0, Math.round(s.t0 * 10), true);
     b.setInt16(2, Math.round(s.t1 * 10), true);
     b.setInt16(4, Math.round(s.t2 * 10), true);
@@ -219,6 +225,7 @@
     b.setInt16(12, Math.round(s.hydFeels * 10), true);
     b.setUint8(14, s.hydMin);
     b.setUint8(15, s.learn ? 1 : 0);
+    b.setUint8(16, s.hrHigh);
     ui.saveBtn.disabled = true;
     const ok = await write(settingsChar, b.buffer, 'whatSettings');
     if (ok && !demo) parseSettings(await settingsChar.readValue());  // 讀回背心實際採用的設定
@@ -251,7 +258,7 @@
     { t0: 27, t1: 29, t2: 36, boost: 0, maxPct: 40, buzzer: false },
     { t0: 27, t1: 29, t2: 37, boost: 0, maxPct: 60, buzzer: true }];
   window.FV.PROFILES = PROFILES;
-  let demoHot = 0, demoHydrateAt = 0;
+  let demoHot = 0, demoHydrateAt = 0, demoHrHigh = 0;
 
   function demoCommand(cmd) {
     const x = state.extra;
@@ -279,6 +286,11 @@
       if (demoHot >= 60) x.flags |= 0x02;
     }
     x.hotMin = demoHot;
+    // 示範用心率：隨體感溫度上升，偶爾超過門檻
+    x.hrState = 3;
+    x.bpm = Math.round(Math.min(175, 88 + Math.max(0, state.feels - 30) * 4 + 12 * Math.sin(demoClock / 7) + (Math.random() - .5) * 4));
+    x.hrPeak = Math.max(x.hrPeak, x.bpm);
+    if (x.bpm >= state.set.hrHigh) demoHrHigh += 1; else demoHrHigh = 0;
   }
 
   function demoApply() {
@@ -295,11 +307,13 @@
     state.mv = 10200 + state.batt / 100 * 2400 - state.ma * .3;
     let f = 0;
     if (state.feels >= heat) f |= FLAG.HEAT;
+    if (demoHrHigh >= 10) f |= FLAG.HR;
     if (low) f |= FLAG.LOW_BATT;
     const wasHeat = state.flags & FLAG.HEAT;
-    if ((f & FLAG.HEAT) && (state.flags & FLAG.MUTED)) f |= FLAG.MUTED;
+    if ((f & (FLAG.HEAT | FLAG.HR)) && (state.flags & FLAG.MUTED)) f |= FLAG.MUTED;
+    const wasHr = state.flags & FLAG.HR;
     state.flags = f;
-    onStatusUpdated(wasHeat);
+    onStatusUpdated(wasHeat, wasHr);
   }
 
   function startDemo() {
@@ -308,7 +322,7 @@
     state.batt = 86; state.wh = 0; state.uptime = 0;
     state.temp = 31; state.hum = 60; state.feels = heatIndex(31, 60);
     state.deviceName = 'FanVest-DEMO';
-    Object.assign(state.extra, { has: true, flags: 0x20 | 0x08 | 0x10, stUpper: 742, stLower: 768, learnShift: -0.8, learnCount: 4 });
+    Object.assign(state.extra, { has: true, flags: 0x20 | 0x08 | 0x10, stUpper: 742, stLower: 768, learnShift: -0.8, learnCount: 4, hrState: 3, bpm: 92, hrPeak: 92 });
     setLink('connected');
     demoApply();
     demoTimer = setInterval(() => {
@@ -331,6 +345,7 @@
   ui.disconnectBtn.addEventListener('click', disconnect);
   ui.modeAuto.addEventListener('click', () => { state.auto = true; render(); sendControl(); });
   ui.modeManual.addEventListener('click', () => { state.auto = false; render(); sendControl(); });
+  document.getElementById('hrMuteBtn').addEventListener('click', () => ui.muteBtn.click());
   ui.muteBtn.addEventListener('click', () => {
     state.flags |= FLAG.MUTED;  // 送出任何控制指令，韌體都會把目前的警示視為已確認
     render();

@@ -1,20 +1,21 @@
 // 溫控風扇背心 - ESP32（藍牙 BLE 版）
 // 需要的函式庫（Arduino IDE 程式庫管理員安裝）：
-//   DHT sensor library、Adafruit Unified Sensor、Adafruit INA219、Adafruit NeoPixel
+//   DHT sensor library、Adafruit Unified Sensor、Adafruit INA219、Adafruit NeoPixel、
+//   SparkFun MAX3010x Pulse and Proximity Sensor Library（心率）
 // 開發板：ESP32 Dev Module，ESP32 core 3.x（BLE、Preferences 已內建）
 // 手機控制頁：用 Android Chrome 開啟 GitHub Pages 上的 docs/index.html
 //
 // 接線：
 //   GPIO25 -> 上方 D4184 PWM、GPIO26 -> 下方 D4184 PWM（兩個模組 GND 都接 ESP32 GND）
 //   GPIO4  -> DHT11 DATA（模組版已內建上拉；裸元件 DATA 與 3.3V 之間接 10kΩ）
-//   GPIO21/22 -> INA219 SDA/SCL（VIN+ 接保險絲後的 +12V，VIN- 接風扇正極）
+//   GPIO21/22 -> INA219 SDA/SCL（VIN+ 接保險絲後的 +12V，VIN- 接風扇正極），MAX30102 心率模組也接同兩條線
 //   GPIO14 -> 主動式蜂鳴器、GPIO32 -> WS2812B DIN、GPIO33 -> 按鈕（另一端接 GND）
-//   3V3 -> DHT11、INA219、WS2812B、蜂鳴器 VCC
+//   3V3 -> DHT11、INA219、MAX30102、WS2812B、蜂鳴器 VCC
 //
 // 按鈕：短按 = 自動 → 手動 30% → 60% → 100% → 關閉 → 自動；連按兩下 = 切換情境模式；
-//       長按 1.5 秒 = 靜音警報並解除過電流保護；開機時按住按鈕 = 進入無線更新（OTA）模式
+//       長按 1.5 秒 = 靜音警報（中暑、心率）並解除過電流保護；開機時按住按鈕 = 進入無線更新（OTA）模式
 //
-// 分檔：fan_vest.ino（主程式、BLE）、features.ino（情境模式、喝水提醒、偏好學習、開機自我檢測）、ota.ino（無線更新）
+// 分檔：fan_vest.ino（主程式、BLE）、features.ino（情境模式、喝水提醒、偏好學習、開機自我檢測）、heartrate.ino（心率）、ota.ino（無線更新）
 // 燒錄設定：Partition Scheme 選「Minimal SPIFFS (1.9MB APP with OTA)」，程式才放得下
 //
 // BLE 資料格式（皆為 little-endian；第一次連線要輸入配對碼 BLE_PIN）：
@@ -26,14 +27,16 @@
 //     16 uint16 本次耗電 Wh×100                     18 uint16 開機分鐘數
 //   CONTROL  （寫入，3～4 bytes）：uint8 自動模式、uint8 手動上方%、uint8 手動下方%（也會靜音警報、解除過電流保護）、
 //                                  uint8 指令（可省略；CMD_*：0～4 = 套用情境模式、254 自我檢測、253 進入 OTA、252 清除學習）
-//   SETTINGS （讀取／寫入，16 bytes，存在 ESP32 記憶體，重開機不會消失）
+//   SETTINGS （讀取／寫入，17 bytes，存在 ESP32 記憶體，重開機不會消失）
 //     0 int16 T0 停止溫度×10   2 int16 T1 啟動溫度×10   4 int16 T2 全速溫度×10   6 uint8 下方加強%
 //     7 int16 中暑警示體感溫度×10   9 uint8 蜂鳴器(1/0)   10 uint8 依體感溫度控制(1/0)
 //     11 uint8 最高轉速上限%   12 int16 喝水提醒體感溫度×10   14 uint8 喝水提醒間隔（分）   15 uint8 偏好學習(1/0)
-//   EXTRA    （讀取／通知，16 bytes）
+//     16 uint8 心率警報門檻 bpm
+//   EXTRA    （讀取／通知，19 bytes）
 //     0  uint8  旗標（EXTRA_*）          1  uint16 連續高溫分鐘數     3  uint16 本次累積高溫分鐘數
 //     5  uint8  情境模式                 6  uint16 自我檢測上方 mA    8  uint16 自我檢測下方 mA（0xFFFF = 未測）
 //     10 uint8  韌體主版本  11 uint8 次版本   12 int16 學習偏移×10（°C，負值 = 提早啟動）   14 uint8 學習樣本數
+//     16 uint8  心率狀態（0 無感測器、1 沒貼到皮膚、2 量測中、3 有讀值）   17 uint8 心率 bpm（0 = 無）   18 uint8 本次最高心率
 //   CONFIG   （讀取，9 bytes）：uint8 最低轉速%、uint8 故障安全轉速%、uint16 過電流門檻 mA、
 //                               uint16 電池空電壓 mV、uint16 電池滿電壓 mV、uint8 低電量轉速上限%
 
@@ -46,12 +49,14 @@
 #include <DHT.h>
 #include <Adafruit_INA219.h>
 #include <Adafruit_NeoPixel.h>
+#include <MAX30105.h>
+#include <heartRate.h>
 
 // ---- 感測器型號：換 DHT22 只要改這行，接線相同 ----
 #define DHT_TYPE DHT11
 
 // ---- 版本 ----
-const uint8_t FW_MAJOR = 1, FW_MINOR = 0;
+const uint8_t FW_MAJOR = 1, FW_MINOR = 1;
 
 // ---- 藍牙（名稱會加上晶片編號後 4 碼，例如 FanVest-3A7F，團隊模式才分得出誰是誰） ----
 const char* BLE_NAME = "FanVest";
@@ -109,6 +114,7 @@ const uint8_t FLAG_FAN_LOW_CURRENT      = 0x04;  // 風扇電流過低，可能�
 const uint8_t FLAG_HEAT_ALERT           = 0x08;  // 體感溫度達中暑警示
 const uint8_t FLAG_LOW_BATTERY          = 0x10;  // 低電量，已限制轉速
 const uint8_t FLAG_ALARM_MUTED          = 0x20;  // 警報已被使用者靜音
+const uint8_t FLAG_HR_ALERT             = 0x40;  // 心率持續過高
 
 // ---- EXTRA 旗標 ----
 const uint8_t EXTRA_HYDRATE   = 0x01;  // 該喝水了（使用者確認前持續）
@@ -137,11 +143,13 @@ struct Settings {
   int hydrateMin = 20;     // 每連續高溫幾分鐘提醒喝水一次
   bool learn = true;       // 依手動調整紀錄自動微調溫度門檻
   int profile = 0;         // 目前的情境模式（PROFILE_*）
+  int hrHigh = 150;        // 心率持續高於此值發出警報（bpm）
 };
 
 DHT dht(PIN_DHT, DHT_TYPE);
 Adafruit_INA219 ina219;
 Adafruit_NeoPixel led(1, PIN_LED, NEO_GRB + NEO_KHZ800);
+MAX30105 pulse;
 Preferences prefs;
 BLECharacteristic* statusChar;
 BLECharacteristic* settingsChar;
@@ -163,6 +171,10 @@ unsigned long lastRampMs = 0;
 float learnShift = 0;
 int learnSamples = 0;
 bool hydrateDue = false;  // 喝水提醒（features.ino 更新）
+
+// 心率（heartrate.ino 更新）
+bool hrFound = false, hrContact = false, hrAlert = false, hrMuted = false;
+int hrBpm = 0, hrPeak = 0;  // 0 = 沒有資料
 
 // 溫濕度
 float tempBuf[SMOOTH_N], humBuf[SMOOTH_N];
@@ -196,14 +208,20 @@ const uint16_t* beepSeq = nullptr;
 int beepLen = 0, beepIdx = 0;
 unsigned long beepUntil = 0;
 
-void beep(const uint16_t* seq, int len) {
-  if (!cfg.buzzer) return;
+void startBeep(const uint16_t* seq, int len) {
   beepSeq = seq;
   beepLen = len;
   beepIdx = 0;
   beepUntil = millis() + seq[0];
   digitalWrite(PIN_BUZZER, HIGH);
 }
+
+void beep(const uint16_t* seq, int len) {
+  if (cfg.buzzer) startBeep(seq, len);
+}
+
+// 安全警報：蜂鳴器設定關閉時也要響
+void alarmBeep(const uint16_t* seq, int len) { startBeep(seq, len); }
 
 void updateBuzzer() {
   if (!beepSeq || millis() < beepUntil) return;
@@ -231,6 +249,7 @@ void loadSettings() {
   cfg.hydrateMin = prefs.getInt("hydmin", cfg.hydrateMin);
   cfg.learn = prefs.getBool("learn", cfg.learn);
   cfg.profile = prefs.getInt("prof", cfg.profile);
+  cfg.hrHigh = prefs.getInt("hrhi", cfg.hrHigh);
   autoMode = prefs.getBool("auto", autoMode);
   manualUpper = prefs.getInt("mf", manualUpper);
   manualLower = prefs.getInt("mb", manualLower);
@@ -257,6 +276,7 @@ void savePrefsIfDue() {
   prefs.putInt("hydmin", cfg.hydrateMin);
   prefs.putBool("learn", cfg.learn);
   prefs.putInt("prof", cfg.profile);
+  prefs.putInt("hrhi", cfg.hrHigh);
   prefs.putBool("auto", autoMode);
   prefs.putInt("mf", manualUpper);
   prefs.putInt("mb", manualLower);
@@ -426,6 +446,7 @@ void updateLed() {
   uint32_t c;
   if (overcurrentTripped) c = (t / 125) % 2 ? led.Color(255, 0, 0) : 0;           // 快閃紅
   else if (heatAlert) c = (t / 500) % 2 ? led.Color(255, 0, 0) : 0;               // 慢閃紅
+  else if (hrAlert) c = (t / 250) % 2 ? led.Color(255, 0, 140) : 0;               // 閃粉紅：心率過高
   else if (hydrateDue) c = (t / 300) % 2 ? led.Color(0, 200, 255) : 0;            // 閃青色：該喝水了
   else if (selfTestActive()) c = led.Color(0, 255, 0);                            // 自我檢測中：綠
   else if (lowBattery && (t / 1000) % 4 == 0) c = led.Color(255, 160, 0);         // 每 4 秒閃一下黃
@@ -439,6 +460,7 @@ void updateLed() {
 void handleButtonAction(ButtonAction action) {
   if (action == BTN_LONG) {
     alarmMuted = heatAlert;
+    hrMuted = hrAlert;
     overcurrentTripped = false;
     acknowledgeHydrate();
     beep(BEEP_DOUBLE, 3);
@@ -519,7 +541,8 @@ uint8_t statusFlags() {
   if (fanLowCurrent) f |= FLAG_FAN_LOW_CURRENT;
   if (heatAlert) f |= FLAG_HEAT_ALERT;
   if (lowBattery) f |= FLAG_LOW_BATTERY;
-  if (alarmMuted) f |= FLAG_ALARM_MUTED;
+  if (alarmMuted || hrMuted) f |= FLAG_ALARM_MUTED;
+  if (hrAlert) f |= FLAG_HR_ALERT;
   return f;
 }
 
@@ -544,7 +567,7 @@ void publishStatus() {
 }
 
 void publishSettings() {
-  uint8_t b[16];
+  uint8_t b[17];
   putInt16(b, tenths(cfg.t0));
   putInt16(b + 2, tenths(cfg.t1));
   putInt16(b + 4, tenths(cfg.t2));
@@ -556,6 +579,7 @@ void publishSettings() {
   putInt16(b + 12, tenths(cfg.hydrateFeels));
   b[14] = cfg.hydrateMin;
   b[15] = cfg.learn ? 1 : 0;
+  b[16] = cfg.hrHigh;
   settingsChar->setValue(b, sizeof(b));
 }
 
@@ -606,6 +630,7 @@ class SettingsCallbacks : public BLECharacteristicCallbacks {
       if (b[14] >= 5 && b[14] <= 120) cfg.hydrateMin = b[14];
       cfg.learn = b[15] != 0;
     }
+    if (v.length() >= 17 && b[16] >= 100 && b[16] <= 220) cfg.hrHigh = b[16];
     settingsChanged = true;
   }
 };
@@ -700,6 +725,7 @@ void setup() {
   inaFound = ina219.begin();
   if (inaFound) ina219.setCalibration_32V_2A();  // 0.1Ω 分流電阻，最大約 3.2A
   else Serial.println("找不到 INA219，電流感測停用（風扇仍正常運作）");
+  setupHeartRate();
 
   setupBle();
   publishStatus();
@@ -733,7 +759,8 @@ void loop() {
   if (controlChanged) {
     controlChanged = false;
     overcurrentTripped = false;  // 使用者重新下指令時解除過電流保護
-    alarmMuted = heatAlert;      // 也當作已確認中暑警示
+    alarmMuted = heatAlert;      // 也當作已確認中暑、心率警報
+    hrMuted = hrAlert;
     acknowledgeHydrate();
     noteManualChange();          // 偏好學習：記錄手動調整
     if (pendingCmd >= 0) {
@@ -753,7 +780,9 @@ void loop() {
     markDirty();
   }
 
+  updateHeartRate();
   readDht();
+  updateHeartRate();  // DHT11 讀取會卡 20ms 左右，前後各讀一次心率才不會漏資料
   sampleCurrent();
   updateButton();
 
@@ -761,14 +790,15 @@ void loop() {
     lastStatusMs = millis();
     updatePowerAverage();
     updateHeatAlert();
+    updateHeartRateAlert();
     updateHydration();
     updateLearning();
     applyFans();
     publishStatus();
     publishExtra();
-    Serial.printf("T=%.1f H=%.0f feels=%.1f upper=%d lower=%d auto=%d V=%.2f I=%.0fmA batt=%d flags=0x%02X\n",
+    Serial.printf("T=%.1f H=%.0f feels=%.1f upper=%d lower=%d auto=%d V=%.2f I=%.0fmA batt=%d HR=%d flags=0x%02X\n",
                   tempC, humidity, feelsC, pctUpper, pctLower, autoMode, busMv / 1000, currentMa, batteryPct,
-                  statusFlags());
+                  hrBpm, statusFlags());
   }
 
   updateSelfTest();

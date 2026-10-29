@@ -1,4 +1,4 @@
-// 進階功能：情境模式、喝水提醒、熱暴露、剩餘時間、天氣、匯出、偏好學習、診斷、自我檢測、OTA
+// 進階功能：心率、情境模式、喝水提醒、熱暴露、剩餘時間、天氣、匯出、偏好學習、診斷、自我檢測、OTA
 (() => {
   const { state, hooks, render, $ } = window.FV;
   const { t } = window.I18N;
@@ -84,11 +84,11 @@
 
   // ---------- 匯出 CSV ----------
   $('exportBtn').addEventListener('click', () => {
-    const head = ['time', 'temp_c', 'humidity_pct', 'feels_c', 'upper_pct', 'lower_pct', 'mode', 'voltage_v', 'current_a', 'battery_pct', 'flags', 'profile'];
+    const head = ['time', 'temp_c', 'humidity_pct', 'feels_c', 'upper_pct', 'lower_pct', 'mode', 'voltage_v', 'current_a', 'battery_pct', 'flags', 'profile', 'heart_bpm'];
     const v = x => (x === null || x === undefined ? '' : x);
     const rows = state.log.map(p => [new Date(p.t).toISOString(), v(p.temp), v(p.hum), p.feels === null ? '' : fmt1(p.feels),
       v(p.upper), v(p.lower), p.auto ? 'auto' : 'manual', p.mv ? (p.mv / 1000).toFixed(2) : '', p.ma !== null ? (p.ma / 1000).toFixed(3) : '',
-      v(p.batt), '0x' + (p.flags || 0).toString(16), v(p.profile)].join(','));
+      v(p.batt), '0x' + (p.flags || 0).toString(16), v(p.profile), v(p.bpm)].join(','));
     const blob = new Blob(['﻿' + [head.join(','), ...rows].join('\n')], { type: 'text/csv' });  // BOM 讓 Excel 正確顯示
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -107,6 +107,7 @@
     $('setHydFeels').value = s.hydFeels;
     $('setHydMin').value = s.hydMin;
     $('setLearn').checked = s.learn;
+    $('setHrHigh').value = s.hrHigh;
   }
 
   // ---------- 自我檢測與 OTA ----------
@@ -157,6 +158,22 @@
     $('diagHint').hidden = !(on && !x.has);
   }
 
+  // ---------- 心率 ----------
+  function renderHeartRate(on) {
+    const s = state, x = s.extra, alert = on && (s.flags & 0x40);
+    $('hrAlert').hidden = !alert;
+    $('hrAlertTitle').textContent = t('hrAlertTitle', { bpm: x.bpm || '—' });
+    $('hrAlertText').textContent = t('hrAlertText');
+    $('hrMuteBtn').hidden = !!(s.flags & 0x20);
+
+    const has = on && x.has && x.hrState !== null;
+    $('hrPanel').hidden = !has;
+    if (!has) return;
+    $('hrNow').textContent = x.hrState === 3 ? x.bpm : '—';
+    $('hrPeakVal').textContent = x.hrPeak || '—';
+    $('hrNote').textContent = [t('hrNoSensor'), t('hrNoContact'), t('hrMeasuring'), t('hrNote', { high: s.set.hrHigh })][x.hrState] || '';
+  }
+
   // ---------- 每次畫面更新 ----------
   function renderFeatures(on) {
     const s = state, x = s.extra, adv = on && x.has;
@@ -191,6 +208,7 @@
     $('learnReset').hidden = !adv || x.learnCount === 0;
 
     $('exportBtn').disabled = s.log.length === 0;
+    renderHeartRate(on);
     renderWeather();
     renderDiag(on);
   }

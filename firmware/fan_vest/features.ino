@@ -194,7 +194,7 @@ void publishExtra() {
     if (stUpperMa >= FAN_MIN_MA) f |= EXTRA_UPPER_OK;
     if (stLowerMa >= FAN_MIN_MA) f |= EXTRA_LOWER_OK;
   }
-  uint8_t b[16];
+  uint8_t b[19];
   b[0] = f;
   putInt16(b + 1, (int16_t)min(hotSeconds / 60, 65535UL));
   putInt16(b + 3, (int16_t)min(totalHotSeconds / 60, 65535UL));
@@ -206,6 +206,9 @@ void publishExtra() {
   putInt16(b + 12, tenths(learnShift));
   b[14] = learnSamples;
   b[15] = 0;
+  b[16] = heartRateState();
+  b[17] = hrBpm;
+  b[18] = hrPeak;
   extraChar->setValue(b, sizeof(b));
   if (clientConnected) extraChar->notify();
 }

@@ -14,7 +14,7 @@
   // 風險等級：3 = 中暑警示、2 = 該喝水／休息或體感偏高、1 = 正常、0 = 斷線
   function risk(m) {
     if (m.link !== 'connected') return 0;
-    if (m.flags & 0x08) return 3;
+    if (m.flags & 0x48) return 3;  // 中暑或心率過高
     if ((m.xflags & 0x03) || (m.feels !== null && m.feels >= m.heat - 3)) return 2;
     return 1;
   }
@@ -23,6 +23,7 @@
   function message(m) {
     if (m.link !== 'connected') return t(m.link === 'lost' ? 'linkLost' : 'teamOfflineMsg');
     if (m.flags & 0x08) return t('teamMsgHeat', { feels: m.feels !== null ? m.feels.toFixed(1) : '—' });
+    if (m.flags & 0x40) return t('hrAlertTitle', { bpm: m.bpm || '—' });
     if (m.xflags & 0x02) return t('restTitle', { min: m.hotMin });
     if (m.xflags & 0x01) return t('hydrateTitle');
     if (m.flags & 0x02) return t('teamMsgOvercurrent');
@@ -101,7 +102,7 @@
   // ---------- 藍牙 ----------
   function parseStatus(m, dv) {
     if (dv.byteLength < 20) return;
-    const wasHeat = m.flags & 0x08;
+    const wasHeat = m.flags & 0x48;
     const t10 = v => (v === INVALID ? null : v / 10);
     m.temp = t10(dv.getInt16(0, true));
     const hum = dv.getUint8(2);
@@ -112,7 +113,7 @@
     const batt = dv.getUint8(14);
     m.batt = batt === 255 ? null : batt;
     m.flags = dv.getUint8(15);
-    if ((m.flags & 0x08) && !wasHeat && navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 400]);
+    if ((m.flags & 0x48) && !wasHeat && navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 400]);
     render();
   }
 
@@ -127,7 +128,11 @@
     parseStatus(m, await st.readValue());
     try {
       const ex = await svc.getCharacteristic(EXTRA);
-      const parseExtra = dv => { m.xflags = dv.getUint8(0); m.hotMin = dv.getUint16(1, true); render(); };
+      const parseExtra = dv => {
+        m.xflags = dv.getUint8(0); m.hotMin = dv.getUint16(1, true);
+        m.bpm = dv.byteLength >= 19 && dv.getUint8(16) === 3 ? dv.getUint8(17) : 0;
+        render();
+      };
       ex.addEventListener('characteristicvaluechanged', e => parseExtra(e.target.value));
       await ex.startNotifications();
       parseExtra(await ex.readValue());

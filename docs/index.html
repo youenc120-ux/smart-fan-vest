@@ -49,6 +49,15 @@
   </section>
 
 
+  <section class="alert" id="hrAlert" role="alert" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+    <div>
+      <p class="alert-title" id="hrAlertTitle"></p>
+      <p id="hrAlertText"></p>
+    </div>
+    <button type="button" id="hrMuteBtn" data-i18n="mute">我知道了</button>
+  </section>
+
   <section class="alert info" id="hydrateAlert" role="alert" hidden>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
     <div>
@@ -83,6 +92,15 @@
     <p class="hint" id="hint">連線後會顯示即時溫度與風速。</p>
   </section>
 
+
+  <section class="panel exposure" id="hrPanel" aria-labelledby="hrTitle" hidden>
+    <h2 id="hrTitle" data-i18n="hrTitle">心率</h2>
+    <div class="stats">
+      <div><p class="p-label" data-i18n="hrNow">目前</p><p class="p-value"><span id="hrNow">—</span><span class="p-unit">bpm</span></p></div>
+      <div><p class="p-label" data-i18n="hrPeak">本次最高</p><p class="p-value"><span id="hrPeakVal">—</span><span class="p-unit">bpm</span></p></div>
+    </div>
+    <p class="slider-note" id="hrNote"></p>
+  </section>
 
   <section class="panel exposure" id="exposurePanel" aria-labelledby="exposureTitle" hidden>
     <h2 id="exposureTitle" data-i18n="exposureTitle">熱暴露</h2>
@@ -185,6 +203,7 @@
       <input type="range" id="setMax" min="30" max="100" step="5" value="100">
       <div class="field"><label for="setHydFeels" data-i18n="setHydFeels">喝水提醒（體感高於）</label><span><input type="number" id="setHydFeels" step="0.5" min="25" max="45" inputmode="decimal"> °C</span></div>
       <div class="field"><label for="setHydMin" data-i18n="setHydMin">每隔</label><span><input type="number" id="setHydMin" step="5" min="5" max="120" inputmode="numeric"> <span data-i18n="minUnit">分</span></span></div>
+      <div class="field"><label for="setHrHigh" data-i18n="setHrHigh">心率警報（持續高於）</label><span><input type="number" id="setHrHigh" step="5" min="100" max="220" inputmode="numeric"> bpm</span></div>
       <label class="toggle"><input type="checkbox" id="setLearn"><span data-i18n="setLearn">學習我的偏好（依手動調整自動微調門檻）</span></label>
       <div class="learn-row"><p class="slider-note" id="learnNote"></p><button class="ghost" type="button" id="learnReset" data-i18n="learnReset">清除學習</button></div>
       <div class="notice err" id="settingsError" hidden><p id="settingsErrorText"></p></div>
