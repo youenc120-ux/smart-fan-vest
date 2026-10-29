@@ -165,6 +165,7 @@
     $('hrAlertTitle').textContent = t('hrAlertTitle', { bpm: x.bpm || '—' });
     $('hrAlertText').textContent = t('hrAlertText');
     $('hrMuteBtn').hidden = !!(s.flags & 0x20);
+    $('hrAlert').classList.toggle('muted', !!(s.flags & 0x20));
 
     // 一直顯示在最上方的即時讀數旁；沒有讀值時在下方說明原因
     const st = !on ? null : !x.has || x.hrState === null ? 'old' : x.hrState;

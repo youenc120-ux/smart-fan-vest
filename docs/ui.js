@@ -182,6 +182,7 @@ window.FV = (() => {
     ui.heatAlertTitle.textContent = t('heatTitle', { feels: s.feels !== null ? fmt1(s.feels) : '—' });
     ui.heatAlertText.textContent = t('heatText');
     ui.muteBtn.hidden = !!(f & FLAG.MUTED);
+    ui.heatAlert.classList.toggle('muted', !!(f & FLAG.MUTED));
 
     // 控制
     ui.modeAuto.disabled = ui.modeManual.disabled = !on;
