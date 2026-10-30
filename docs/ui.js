@@ -7,7 +7,7 @@ window.FV = (() => {
     'level', 'pctUpper', 'pctLower', 'fanIcon', 'hum', 'feels', 'sensorError', 'sensorErrorText', 'hint',
     'modeAuto', 'modeManual', 'sliderUpper', 'sliderLower', 'outUpper', 'outLower', 'sliderNote',
     'battPct', 'battFill', 'amps', 'volts', 'watts', 'usage', 'powerGrid', 'powerNote', 'overcurrent',
-    'overcurrentText', 'fanLow', 'fanLowText', 'lowBatt', 'lowBattText', 'historyChart', 'historyNote',
+    'overcurrentText', 'fanLow', 'fanLowText', 'lowBatt', 'lowBattText', 'historyChart', 'hrChart', 'historyNote',
     'chart', 'curveSub', 'settingsForm', 'setT0', 'setT1', 'setT2', 'setHeat', 'setBoost', 'outBoost',
     'setFeels', 'setBuzzer', 'saveBtn', 'settingsError', 'settingsErrorText', 'settingsNote',
     'disconnectBtn', 'foot'];
@@ -23,7 +23,7 @@ window.FV = (() => {
     mv: null, ma: null, batt: null, flags: FLAG.POWER_MISSING, wh: 0, uptime: 0,
     cfg: { dmin: 30, fail: 70, ocMa: 3000, emptyMv: 10200, fullMv: 12600, lowCap: 70 },
     set: { t0: 26, t1: 28, t2: 35, boost: 10, heat: 40, buzzer: true, useFeels: true,
-      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true, hrHigh: 150 },
+      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true, hrHigh: 150, hrFan: true },
     // EXTRA 特徵值（features.ino）：舊版韌體沒有，hasExtra = false
     extra: { has: false, flags: 0, hotMin: 0, totalHotMin: 0, profile: 0, stUpper: null, stLower: null,
       fw: '', learnShift: 0, learnCount: 0, hrState: null, bpm: 0, hrPeak: 0 },
@@ -108,7 +108,8 @@ window.FV = (() => {
   function pushHistory() {
     const now = Date.now(), h = state.history;
     if (h.length && now - h[h.length - 1].t < 900) return;
-    h.push({ t: now, temp: state.temp, feels: state.feels, pct: Math.max(state.upper || 0, state.lower || 0) });
+    const bpm = state.extra.hrState === 3 && state.extra.bpm ? state.extra.bpm : null;
+    h.push({ t: now, temp: state.temp, feels: state.feels, pct: Math.max(state.upper || 0, state.lower || 0), bpm });
     while (h.length && now - h[0].t > H.span) h.shift();
     const s = state;
     s.log.push({ t: now, temp: s.temp, hum: s.hum, feels: s.feels, upper: s.upper, lower: s.lower, auto: s.auto,
@@ -141,6 +142,33 @@ window.FV = (() => {
     const line = key => h.filter(p => p[key] !== null).map(p => `${tx(p.t)},${ty(p[key])}`).join(' ');
     el('polyline', { class: 'h-feels', points: line('feels') }, svg);
     el('polyline', { class: 'h-temp', points: line('temp') }, svg);
+  }
+
+  // 心率圖：和上面的溫度圖共用時間軸
+  const HR = { y0: 80, y1: 8 };
+  function drawHrHistory() {
+    const svg = ui.hrChart, h = state.history, now = Date.now(), high = state.set.hrHigh;
+    svg.textContent = '';
+    const vals = h.map(p => p.bpm).filter(v => v);
+    const lo = Math.max(40, Math.floor(((vals.length ? Math.min(...vals) : 70) - 10) / 10) * 10);
+    const hi = Math.max(high + 10, Math.ceil(((vals.length ? Math.max(...vals) : 120) + 10) / 10) * 10);
+    const tx = time => H.x0 + (1 - (now - time) / H.span) * (H.x1 - H.x0);
+    const ty = v => HR.y0 - (v - lo) / (hi - lo) * (HR.y0 - HR.y1);
+    for (const v of [lo, hi]) {
+      el('line', { class: 'axis', x1: H.x0, x2: H.x1, y1: ty(v), y2: ty(v) }, svg);
+      el('text', { class: 'tick', x: H.x0 - 6, y: ty(v) + 4, 'text-anchor': 'end' }, svg).textContent = v;
+    }
+    el('line', { class: 'h-alert', x1: H.x0, x2: H.x1, y1: ty(high), y2: ty(high) }, svg);
+    el('text', { class: 'tick', x: H.x1 + 6, y: ty(high) + 4 }, svg).textContent = high;
+    if (!vals.length) {
+      el('text', { class: 'tick', x: (H.x0 + H.x1) / 2, y: (HR.y0 + HR.y1) / 2 + 4, 'text-anchor': 'middle' }, svg).textContent = t('hrChartEmpty');
+      return;
+    }
+    // 沒讀值的時段斷開，不要畫成直線連過去
+    let seg = [];
+    const flush = () => { if (seg.length > 1) el('polyline', { class: 'h-hr', points: seg.join(' ') }, svg); seg = []; };
+    for (const p of h) { if (p.bpm) seg.push(tx(p.t) + ',' + ty(p.bpm)); else flush(); }
+    flush();
   }
 
   // ---------- 主畫面 ----------
@@ -179,8 +207,10 @@ window.FV = (() => {
     // 中暑警示
     const heat = on && (f & FLAG.HEAT);
     ui.heatAlert.hidden = !heat;
-    ui.heatAlertTitle.textContent = t('heatTitle', { feels: s.feels !== null ? fmt1(s.feels) : '—' });
-    ui.heatAlertText.textContent = t('heatText');
+    const strain = s.extra.has && (s.extra.flags & 0x40);  // 體感溫度偏高＋心率偏快
+    const feelsTxt = s.feels !== null ? fmt1(s.feels) : '—';
+    ui.heatAlertTitle.textContent = strain ? t('strainTitle', { feels: feelsTxt, bpm: s.extra.bpm || '—' }) : t('heatTitle', { feels: feelsTxt });
+    ui.heatAlertText.textContent = t(strain ? 'strainText' : 'heatText');
     ui.muteBtn.hidden = !!(f & FLAG.MUTED);
     ui.heatAlert.classList.toggle('muted', !!(f & FLAG.MUTED));
 
@@ -200,6 +230,7 @@ window.FV = (() => {
     renderPower(on);
     drawCurve();
     drawHistory();
+    drawHrHistory();
     hooks.forEach(fn => fn(on));
   }
 

@@ -48,13 +48,14 @@
     state.set = {
       t0: dv.getInt16(0, true) / 10, t1: dv.getInt16(2, true) / 10, t2: dv.getInt16(4, true) / 10,
       boost: dv.getUint8(6), heat: dv.getInt16(7, true) / 10, buzzer: dv.getUint8(9) === 1, useFeels: dv.getUint8(10) === 1,
-      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true, hrHigh: 150,
+      maxPct: 100, hydFeels: 32, hydMin: 20, learn: true, hrHigh: 150, hrFan: true,
     };
     if (dv.byteLength >= 16) {
       Object.assign(state.set, { maxPct: dv.getUint8(11), hydFeels: dv.getInt16(12, true) / 10,
         hydMin: dv.getUint8(14), learn: dv.getUint8(15) === 1 });
     }
     if (dv.byteLength >= 17) state.set.hrHigh = dv.getUint8(16);
+    if (dv.byteLength >= 18) state.set.hrFan = dv.getUint8(17) === 1;
     buildCurve();
     fillSettingsForm();
   }
@@ -205,7 +206,7 @@
 
     const g = id => document.getElementById(id);
     Object.assign(s, { maxPct: Number(g('setMax').value), hydFeels: n(g('setHydFeels')),
-      hydMin: Math.round(n(g('setHydMin'))), learn: g('setLearn').checked, hrHigh: Math.round(n(g('setHrHigh'))) });
+      hydMin: Math.round(n(g('setHydMin'))), learn: g('setLearn').checked, hrHigh: Math.round(n(g('setHrHigh'))), hrFan: g('setHrFan').checked });
     if (Number.isNaN(s.hydFeels) || s.hydFeels < 25 || s.hydFeels > 45) err = t('errHydFeels');
     else if (Number.isNaN(s.hydMin) || s.hydMin < 5 || s.hydMin > 120) err = t('errHydMin');
     else if (Number.isNaN(s.hrHigh) || s.hrHigh < 100 || s.hrHigh > 220) err = t('errHrHigh');
@@ -213,7 +214,7 @@
     ui.settingsErrorText.textContent = err;
     if (err) return;
 
-    const b = new DataView(new ArrayBuffer(17));
+    const b = new DataView(new ArrayBuffer(18));
     b.setInt16(0, Math.round(s.t0 * 10), true);
     b.setInt16(2, Math.round(s.t1 * 10), true);
     b.setInt16(4, Math.round(s.t2 * 10), true);
@@ -226,6 +227,7 @@
     b.setUint8(14, s.hydMin);
     b.setUint8(15, s.learn ? 1 : 0);
     b.setUint8(16, s.hrHigh);
+    b.setUint8(17, s.hrFan ? 1 : 0);
     ui.saveBtn.disabled = true;
     const ok = await write(settingsChar, b.buffer, 'whatSettings');
     if (ok && !demo) parseSettings(await settingsChar.readValue());  // 讀回背心實際採用的設定
@@ -278,7 +280,7 @@
 
   function demoExtra() {
     const x = state.extra;
-    x.has = true; x.fw = '1.0 (demo)';
+    x.has = true; x.fw = '1.2 (demo)';
     if (state.feels >= state.set.hydFeels) {  // 示範用：每秒當作 1 分鐘
       demoHot += 1; x.totalHotMin += 1;
       if (!demoHydrateAt) demoHydrateAt = state.set.hydMin;
@@ -301,8 +303,16 @@
     const auto = !demoFanOn ? 0 : temp >= t2 ? 100 : Math.max(dmin, Math.round(dmin + (temp - t1) / (t2 - t1) * (100 - dmin)));
     const low = state.batt < 20;
     const lim = p => { p = Math.min(p, maxPct); p = low ? Math.min(p, lowCap) : p; return p > 0 && p < dmin ? dmin : p; };
-    state.upper = lim(state.auto ? auto : state.manualUpper);
-    state.lower = lim(state.auto ? (auto ? Math.min(100, auto + boost) : 0) : state.manualLower);
+    // 心率連動（與韌體相同）：偏快加 20%，心率警報時全速
+    const x = state.extra, hrAlert = demoHrHigh >= 10;
+    let a = auto, boosting = false;
+    if (state.auto && state.set.hrFan && x.bpm) {
+      if (hrAlert) { a = 100; boosting = true; }
+      else if (x.bpm >= state.set.hrHigh - 20) { a = Math.min(100, Math.max(a, dmin) + 20); boosting = true; }
+    }
+    x.flags = boosting ? x.flags | 0x80 : x.flags & ~0x80;
+    state.upper = lim(state.auto ? a : state.manualUpper);
+    state.lower = lim(state.auto ? (a ? Math.min(100, a + boost) : 0) : state.manualLower);
     state.ma = 3 + (state.upper + state.lower) * 8 + (Math.random() - .5) * 30;
     state.mv = 10200 + state.batt / 100 * 2400 - state.ma * .3;
     let f = 0;

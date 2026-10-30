@@ -108,6 +108,7 @@
     $('setHydMin').value = s.hydMin;
     $('setLearn').checked = s.learn;
     $('setHrHigh').value = s.hrHigh;
+    $('setHrFan').checked = s.hrFan;
   }
 
   // ---------- 自我檢測與 OTA ----------
@@ -175,7 +176,8 @@
     $('hrIcon').classList.toggle('beat', live);
     if (live) $('hrIcon').style.setProperty('--hr-period', (60 / x.bpm).toFixed(2) + 's');
     $('hrNow').parentElement.classList.toggle('alert', live && x.bpm >= s.set.hrHigh);
-    const why = { old: 'hrOldFw', 0: 'hrNoSensor', 1: 'hrNoContact', 2: 'hrMeasuring' }[st];
+    const why = { old: 'hrOldFw', 0: 'hrNoSensor', 1: 'hrNoContact', 2: 'hrMeasuring' }[st]
+      || (live && (x.flags & 0x80) ? 'hrBoosting' : null);
     $('hrNote').hidden = !why;
     if (why) $('hrNote').textContent = t(why);
   }

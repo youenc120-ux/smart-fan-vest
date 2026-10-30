@@ -88,7 +88,7 @@
     };
     stats.append(
       stat(t('feelsLike'), m.feels !== null ? m.feels.toFixed(1) : null, '°C'),
-      stat(t('humidity'), m.hum, '%'),
+      stat(t('hrTitle'), m.bpm || null, 'bpm'),
       stat(t('teamFan'), Math.max(m.upper || 0, m.lower || 0), '%'),
       stat(t('teamBattery'), m.batt, '%'));
 
@@ -213,6 +213,8 @@
       m.flags = m.feels >= m.heat ? 0x08 : 0;
       if (m.feels >= 32) m.hotMin += 1;
       m.xflags = m.hotMin >= 60 ? 0x02 : m.hotMin % 20 === 0 && m.hotMin ? 0x01 : 0;
+      m.bpm = Math.round(Math.min(175, 85 + Math.max(0, m.feels - 30) * 5 + 8 * Math.sin(m.clock / 6)));
+      if (m.bpm >= 150) m.flags |= 0x40;
       render();
     }, 1000);
     members.set(m.id, m);

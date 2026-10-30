@@ -205,6 +205,9 @@ input[type="range"]:disabled { cursor: default; opacity: .35; }
 .lg-temp { background: var(--text); }
 .lg-feels { background: var(--hot); }
 .lg-fan { background: rgba(56, 189, 248, .6); height: 8px !important; }
+.lg-hr { background: #ff4d8d; }
+.lg-hr-alert { background: repeating-linear-gradient(to right, var(--peak) 0 3px, transparent 3px 6px); }
+.h-hr { fill: none; stroke: #ff4d8d; stroke-width: 2; stroke-linejoin: round; }
 .curve .sub { margin: 0; font-size: 14px; color: var(--text-2); }
 .axis { stroke: var(--line); stroke-width: 1; }
 .tick { fill: var(--text-2); font: 500 11px var(--num); font-variant-numeric: tabular-nums; }

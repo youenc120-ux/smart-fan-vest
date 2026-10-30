@@ -27,11 +27,11 @@
 //     16 uint16 本次耗電 Wh×100                     18 uint16 開機分鐘數
 //   CONTROL  （寫入，3～4 bytes）：uint8 自動模式、uint8 手動上方%、uint8 手動下方%（也會靜音警報、解除過電流保護）、
 //                                  uint8 指令（可省略；CMD_*：0～4 = 套用情境模式、254 自我檢測、253 進入 OTA、252 清除學習）
-//   SETTINGS （讀取／寫入，17 bytes，存在 ESP32 記憶體，重開機不會消失）
+//   SETTINGS （讀取／寫入，18 bytes，存在 ESP32 記憶體，重開機不會消失）
 //     0 int16 T0 停止溫度×10   2 int16 T1 啟動溫度×10   4 int16 T2 全速溫度×10   6 uint8 下方加強%
 //     7 int16 中暑警示體感溫度×10   9 uint8 蜂鳴器(1/0)   10 uint8 依體感溫度控制(1/0)
 //     11 uint8 最高轉速上限%   12 int16 喝水提醒體感溫度×10   14 uint8 喝水提醒間隔（分）   15 uint8 偏好學習(1/0)
-//     16 uint8 心率警報門檻 bpm
+//     16 uint8 心率警報門檻 bpm   17 uint8 心率連動風扇(1/0)
 //   EXTRA    （讀取／通知，19 bytes）
 //     0  uint8  旗標（EXTRA_*）          1  uint16 連續高溫分鐘數     3  uint16 本次累積高溫分鐘數
 //     5  uint8  情境模式                 6  uint16 自我檢測上方 mA    8  uint16 自我檢測下方 mA（0xFFFF = 未測）
@@ -56,7 +56,7 @@
 #define DHT_TYPE DHT11
 
 // ---- 版本 ----
-const uint8_t FW_MAJOR = 1, FW_MINOR = 1;
+const uint8_t FW_MAJOR = 1, FW_MINOR = 2;
 
 // ---- 藍牙（名稱會加上晶片編號後 4 碼，例如 FanVest-3A7F，團隊模式才分得出誰是誰） ----
 const char* BLE_NAME = "FanVest";
@@ -101,6 +101,17 @@ const int FAN_MIN_MA = 80;                 // 風扇在轉卻低於此電流，�
 const int FAN_CHECK_PCT = 50;              // 轉速達此值以上才檢查低電流
 const unsigned long FAN_CHECK_DELAY_MS = 2000;
 
+// ---- 心率連動 ----
+const int HR_BOOST_MARGIN = 20;        // 心率高於「警報門檻 − 20」開始加大風速
+const int HR_BOOST_PCT = 20;           // 加大多少 %（心率警報時直接全速）
+const float STRAIN_FEELS_MARGIN = 4;   // 熱壓力：體感溫度只差中暑警示 4°C 以內
+const int STRAIN_HR_MARGIN = 15;       // 而且心率高於「警報門檻 − 15」
+const unsigned long STRAIN_HOLD_MS = 30000;  // 兩者同時持續 30 秒才警示
+
+// ---- 省電 ----
+const int CPU_MHZ = 80;                       // 80MHz 足夠 BLE 與 PWM，比 240MHz 省約 20mA
+const unsigned long DHT_IDLE_INTERVAL_MS = 5000;  // 風扇停止、沒有警示、手機沒連線時，溫濕度改成 5 秒讀一次
+
 // ---- 電池（預設 3 串鋰電池；若電池輸出是穩壓 12V，電量顯示會不準，見 README） ----
 const int BATT_EMPTY_MV = 10200;
 const int BATT_FULL_MV  = 12600;
@@ -123,6 +134,8 @@ const uint8_t EXTRA_SELF_TEST = 0x04;  // 自我檢測進行中
 const uint8_t EXTRA_UPPER_OK  = 0x08;  // 自我檢測：上方風扇電流正常
 const uint8_t EXTRA_LOWER_OK  = 0x10;  // 自我檢測：下方風扇電流正常
 const uint8_t EXTRA_TESTED    = 0x20;  // 自我檢測已完成（搭配上兩項判斷結果）
+const uint8_t EXTRA_STRAIN    = 0x40;  // 中暑警示是由「體感溫度偏高＋心率偏快」觸發（熱壓力）
+const uint8_t EXTRA_HR_BOOST  = 0x80;  // 心率偏快，自動模式已加大風速
 
 // ---- 情境模式、按鈕動作與手機指令（型別要在任何函式之前宣告） ----
 enum Profile { PROFILE_CUSTOM, PROFILE_OUTDOOR, PROFILE_SPORT, PROFILE_QUIET, PROFILE_ECO, PROFILE_COUNT };
@@ -144,6 +157,7 @@ struct Settings {
   bool learn = true;       // 依手動調整紀錄自動微調溫度門檻
   int profile = 0;         // 目前的情境模式（PROFILE_*）
   int hrHigh = 150;        // 心率持續高於此值發出警報（bpm）
+  bool hrFan = true;       // 心率偏快時自動模式加大風速
 };
 
 DHT dht(PIN_DHT, DHT_TYPE);
@@ -192,7 +206,8 @@ int batteryPct = -1;
 
 // 警報
 bool heatAlert = false, alarmMuted = false;
-unsigned long lastHeatBeepMs = 0;
+bool heatByStrain = false, hrBoosting = false;  // 熱壓力觸發的警示、心率連動加速中
+unsigned long lastHeatBeepMs = 0, strainSince = 0;
 
 // 設定存檔（延遲寫入，減少快閃記憶體磨損）
 bool prefsDirty = false;
@@ -250,6 +265,7 @@ void loadSettings() {
   cfg.learn = prefs.getBool("learn", cfg.learn);
   cfg.profile = prefs.getInt("prof", cfg.profile);
   cfg.hrHigh = prefs.getInt("hrhi", cfg.hrHigh);
+  cfg.hrFan = prefs.getBool("hrfan", cfg.hrFan);
   autoMode = prefs.getBool("auto", autoMode);
   manualUpper = prefs.getInt("mf", manualUpper);
   manualLower = prefs.getInt("mb", manualLower);
@@ -277,6 +293,7 @@ void savePrefsIfDue() {
   prefs.putBool("learn", cfg.learn);
   prefs.putInt("prof", cfg.profile);
   prefs.putInt("hrhi", cfg.hrHigh);
+  prefs.putBool("hrfan", cfg.hrFan);
   prefs.putBool("auto", autoMode);
   prefs.putInt("mf", manualUpper);
   prefs.putInt("mb", manualLower);
@@ -284,8 +301,14 @@ void savePrefsIfDue() {
 }
 
 // ---------- 溫濕度 ----------
+// 閒置（風扇停止、沒有警示、手機沒連線）時讀慢一點省電
+unsigned long dhtInterval() {
+  bool idle = pctUpper == 0 && pctLower == 0 && !heatAlert && !hrAlert && !clientConnected;
+  return idle ? DHT_IDLE_INTERVAL_MS : DHT_INTERVAL_MS;
+}
+
 void readDht() {
-  if (millis() - lastDhtMs < DHT_INTERVAL_MS) return;
+  if (millis() - lastDhtMs < dhtInterval()) return;
   lastDhtMs = millis();
   float t = dht.readTemperature();
   float h = dht.readHumidity();
@@ -327,7 +350,7 @@ int autoPercent(float t) {
 
 int limitPct(int pct) {
   if (overcurrentTripped) return 0;  // 過電流保護跳脫後維持停止，直到使用者重新下指令
-  pct = min(pct, cfg.maxPct);
+  if (!(hrBoosting && hrAlert)) pct = min(pct, cfg.maxPct);  // 心率警報時不受安靜、省電的上限限制
   if (lowBattery) pct = min(pct, LOW_BATT_MAX_PCT);
   if (pct > 0 && pct < DUTY_MIN) pct = DUTY_MIN;
   return pct;
@@ -335,8 +358,10 @@ int limitPct(int pct) {
 
 void applyFans() {
   int upper, lower;
+  hrBoosting = false;  // 手動模式不連動
   if (autoMode) {
     upper = autoPercent(controlTemp());
+    upper = hrBoost(upper);
     lower = upper > 0 ? min(100, upper + cfg.lowerBoost) : 0;
   } else {
     upper = manualUpper;
@@ -350,6 +375,21 @@ void applyFans() {
   if ((upper > 0 || lower > 0) && pctUpper == 0 && pctLower == 0) fanOnSince = now;
   pctUpper = upper;
   pctLower = lower;
+}
+
+// 心率連動：心率偏快時加大風速，心率警報或熱壓力警示時全速（只在自動模式）
+int hrBoost(int pct) {
+  hrBoosting = false;
+  if (!cfg.hrFan || hrBpm == 0) return pct;
+  if (hrAlert || (heatAlert && heatByStrain)) {
+    hrBoosting = true;
+    return 100;
+  }
+  if (hrBpm >= cfg.hrHigh - HR_BOOST_MARGIN) {
+    hrBoosting = true;
+    return min(100, max(pct, DUTY_MIN) + HR_BOOST_PCT);
+  }
+  return pct;
 }
 
 // 平滑調速：實際輸出慢慢靠近目標；啟動瞬間、停止與過電流則立即反應
@@ -417,11 +457,18 @@ void updatePowerAverage() {
 }
 
 // ---------- 中暑警示 ----------
+// 體感溫度達門檻，或「體感溫度接近門檻＋心率偏快」持續 30 秒（熱壓力），都會警示
 void updateHeatAlert() {
   bool was = heatAlert;
+  bool strainNow = !isnan(feelsC) && hrBpm > 0 && feelsC >= cfg.heatAlert - STRAIN_FEELS_MARGIN &&
+                   hrBpm >= cfg.hrHigh - STRAIN_HR_MARGIN;
+  if (!strainNow) strainSince = 0;
+  else if (strainSince == 0) strainSince = millis();
+  bool strainHeld = strainNow && millis() - strainSince >= STRAIN_HOLD_MS;
   if (isnan(feelsC)) heatAlert = false;
-  else if (!heatAlert && feelsC >= cfg.heatAlert) heatAlert = true;
-  else if (heatAlert && feelsC < cfg.heatAlert - 1) heatAlert = false;
+  else if (!heatAlert && (feelsC >= cfg.heatAlert || strainHeld)) heatAlert = true;
+  else if (heatAlert && feelsC < cfg.heatAlert - 1 && !strainNow) heatAlert = false;
+  heatByStrain = heatAlert && !isnan(feelsC) && feelsC < cfg.heatAlert;
   if (!heatAlert) alarmMuted = false;
   if (heatAlert && !alarmMuted && (!was || millis() - lastHeatBeepMs >= 60000)) {
     lastHeatBeepMs = millis();
@@ -567,7 +614,7 @@ void publishStatus() {
 }
 
 void publishSettings() {
-  uint8_t b[17];
+  uint8_t b[18];
   putInt16(b, tenths(cfg.t0));
   putInt16(b + 2, tenths(cfg.t1));
   putInt16(b + 4, tenths(cfg.t2));
@@ -580,6 +627,7 @@ void publishSettings() {
   b[14] = cfg.hydrateMin;
   b[15] = cfg.learn ? 1 : 0;
   b[16] = cfg.hrHigh;
+  b[17] = cfg.hrFan ? 1 : 0;
   settingsChar->setValue(b, sizeof(b));
 }
 
@@ -631,6 +679,7 @@ class SettingsCallbacks : public BLECharacteristicCallbacks {
       cfg.learn = b[15] != 0;
     }
     if (v.length() >= 17 && b[16] >= 100 && b[16] <= 220) cfg.hrHigh = b[16];
+    if (v.length() >= 18) cfg.hrFan = b[17] != 0;
     settingsChanged = true;
   }
 };
@@ -693,11 +742,14 @@ void setupBle() {
   service->start();
   BLEAdvertising* adv = BLEDevice::getAdvertising();
   adv->addServiceUUID(SERVICE_UUID);  // 網頁用服務 UUID 篩選裝置
+  adv->setMinInterval(320);  // 廣播間隔 200～300ms（單位 0.625ms），省電且手機仍很快找到
+  adv->setMaxInterval(480);
   adv->setScanResponse(true);
   BLEDevice::startAdvertising();
 }
 
 void setup() {
+  setCpuFrequencyMhz(CPU_MHZ);
   Serial.begin(115200);
 
   ledcAttach(PIN_FAN_UPPER, PWM_FREQ, PWM_RES);

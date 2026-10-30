@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <header class="bar">
@@ -166,6 +166,8 @@
         <span><i class="lg-temp"></i><span data-i18n="legendTemp">溫度</span></span><span><i class="lg-feels"></i><span data-i18n="legendFeels">體感</span></span><span><i class="lg-fan"></i><span data-i18n="legendFan">風速（右軸）</span></span>
       </div>
       <svg id="historyChart" viewBox="0 0 340 170" role="img" data-i18n-aria="historyChart" aria-label="最近 10 分鐘溫度與風速"></svg>
+      <div class="legend"><span><i class="lg-hr"></i><span data-i18n="legendHr">心率</span></span><span><i class="lg-hr-alert"></i><span data-i18n="legendHrAlert">警報門檻</span></span></div>
+      <svg id="hrChart" viewBox="0 0 340 100" role="img" data-i18n-aria="hrChart" aria-label="最近 10 分鐘心率"></svg>
 
       <button class="secondary" type="button" id="exportBtn" data-i18n="exportBtn" disabled>匯出紀錄（CSV）</button>
       <p class="slider-note" id="historyNote" data-i18n="historyNote">連線後開始記錄，網頁關閉後會清除。</p>
@@ -200,7 +202,8 @@
         <input type="range" id="setMax" min="30" max="100" step="5" value="100">
         <div class="field"><label for="setHydFeels" data-i18n="setHydFeels">喝水提醒（體感高於）</label><span><input type="number" id="setHydFeels" step="0.5" min="25" max="45" inputmode="decimal"> °C</span></div>
         <div class="field"><label for="setHydMin" data-i18n="setHydMin">每隔</label><span><input type="number" id="setHydMin" step="5" min="5" max="120" inputmode="numeric"> <span data-i18n="minUnit">分</span></span></div>
-        <div class="field"><label for="setHrHigh" data-i18n="setHrHigh">心率警報（持續高於）</label><span><input type="number" id="setHrHigh" step="5" min="100" max="220" inputmode="numeric"> bpm</span></div>
+        <label class="toggle"><input type="checkbox" id="setHrFan"><span data-i18n="setHrFan">心率偏快時自動加大風速（自動模式）</span></label>
+      <div class="field"><label for="setHrHigh" data-i18n="setHrHigh">心率警報（持續高於）</label><span><input type="number" id="setHrHigh" step="5" min="100" max="220" inputmode="numeric"> bpm</span></div>
         <label class="toggle"><input type="checkbox" id="setLearn"><span data-i18n="setLearn">學習我的偏好（依手動調整自動微調門檻）</span></label>
         <div class="learn-row"><p class="slider-note" id="learnNote"></p><button class="ghost" type="button" id="learnReset" data-i18n="learnReset">清除學習</button></div>
         <div class="notice err" id="settingsError" hidden><p id="settingsErrorText"></p></div>
@@ -234,10 +237,10 @@
     <button type="button" role="tab" id="tab-settings" data-tab="settings" aria-controls="view-settings" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg><span data-i18n="navSettings">設定</span></button>
 </nav>
 
-<script src="i18n.js?v=12"></script>
-<script src="ui.js?v=12"></script>
-<script src="app.js?v=12"></script>
-<script src="features.js?v=12"></script>
-<script src="nav.js?v=12"></script>
+<script src="i18n.js?v=13"></script>
+<script src="ui.js?v=13"></script>
+<script src="app.js?v=13"></script>
+<script src="features.js?v=13"></script>
+<script src="nav.js?v=13"></script>
 </body>
 </html>

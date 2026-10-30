@@ -3,6 +3,9 @@
 // 感測器要貼著皮膚（例如縫在領口內側貼脖子），動作太大時讀值會不穩，只當作參考與提醒
 
 const uint32_t HR_CONTACT_IR = 50000;              // 紅外線反射低於此值 = 沒貼到皮膚
+const uint8_t HR_IR_FULL = 0x1F, HR_IR_LOW = 0x06; // 紅外線亮度：量測時 / 沒貼到皮膚時（省電）
+const uint8_t HR_RED = 0x0A;
+const unsigned long HR_IDLE_MS = 10000;            // 沒貼到皮膚 10 秒後調暗
 const int HR_SAMPLE_MS = 10;                       // 400Hz 取 4 次平均 = 每 10ms 一筆
 const int HR_AVG_N = 4;                            // 取最近 4 次心跳平均
 const unsigned long HR_STALE_MS = 4000;            // 超過 4 秒沒偵測到心跳就當作沒資料
@@ -11,6 +14,8 @@ const unsigned long HR_BEEP_REPEAT_MS = 30000;     // 未靜音時每 30 秒再�
 const uint16_t BEEP_HR[] = {60, 60, 60, 60, 60, 60, 60, 400};
 
 int hrRates[HR_AVG_N], hrRateCount = 0, hrRateIdx = 0;
+bool hrLowPower = false;
+unsigned long hrNoContactSince = 0;
 unsigned long hrSampleNo = 0, hrLastBeatNo = 0, hrLastBeatMs = 0, hrHighSince = 0, hrLastBeepMs = 0;
 
 void setupHeartRate() {
@@ -20,8 +25,19 @@ void setupHeartRate() {
     return;
   }
   pulse.setup(0x1F, 4, 2, 400, 411, 4096);  // 亮度、4 次平均、紅光+紅外線、400Hz、脈寬、範圍
-  pulse.setPulseAmplitudeRed(0x0A);         // 紅光只用來看有沒有貼到，調暗省電
+  pulse.setPulseAmplitudeRed(HR_RED);       // 紅光只用來看有沒有貼到，調暗省電
+  hrNoContactSince = millis();              // 開機 10 秒內沒貼到皮膚也會調暗
 }
+
+// 沒貼到皮膚時把燈調暗、關紅光；調暗後反射也變弱，判斷門檻跟著按比例降低
+void setHeartRateLowPower(bool low) {
+  if (low == hrLowPower) return;
+  hrLowPower = low;
+  pulse.setPulseAmplitudeIR(low ? HR_IR_LOW : HR_IR_FULL);
+  pulse.setPulseAmplitudeRed(low ? 0 : HR_RED);
+}
+
+uint32_t contactThreshold() { return hrLowPower ? HR_CONTACT_IR * HR_IR_LOW / HR_IR_FULL : HR_CONTACT_IR; }
 
 void resetHeartRate() {
   hrBpm = 0;
@@ -37,10 +53,12 @@ void updateHeartRate() {
     uint32_t ir = pulse.getFIFOIR();
     pulse.nextSample();
     hrSampleNo++;
-    bool contact = ir >= HR_CONTACT_IR;
+    bool contact = ir >= contactThreshold();
     if (contact != hrContact) {
       hrContact = contact;
       resetHeartRate();
+      hrNoContactSince = contact ? 0 : millis();
+      if (contact) setHeartRateLowPower(false);  // 一貼上就恢復正常亮度
     }
     if (!contact || !checkForBeat(ir)) continue;
     // 用樣本數算時間，比 millis() 準（資料是一批一批讀出來的）
@@ -62,6 +80,7 @@ void updateHeartRate() {
     }
   }
   if (hrBpm && millis() - hrLastBeatMs > HR_STALE_MS) resetHeartRate();
+  if (!hrContact && hrNoContactSince && millis() - hrNoContactSince >= HR_IDLE_MS) setHeartRateLowPower(true);
 }
 
 // 每秒呼叫一次：心率持續高於門檻就響蜂鳴器。這是安全警報，蜂鳴器設定關閉時也會響

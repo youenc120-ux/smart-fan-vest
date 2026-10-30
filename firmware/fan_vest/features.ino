@@ -194,6 +194,8 @@ void publishExtra() {
     if (stUpperMa >= FAN_MIN_MA) f |= EXTRA_UPPER_OK;
     if (stLowerMa >= FAN_MIN_MA) f |= EXTRA_LOWER_OK;
   }
+  if (heatByStrain) f |= EXTRA_STRAIN;
+  if (hrBoosting) f |= EXTRA_HR_BOOST;
   uint8_t b[19];
   b[0] = f;
   putInt16(b + 1, (int16_t)min(hotSeconds / 60, 65535UL));
