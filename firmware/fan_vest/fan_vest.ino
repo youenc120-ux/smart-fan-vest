@@ -84,7 +84,7 @@ const int PIN_BUZZER    = 14;
 const int PIN_LED       = 32;
 const int PIN_BUTTON    = 33;
 const int PIN_PULSE     = 34;   // 類比心率感測器 S（只能用 ADC1 的腳：32～39，34 是純輸入腳）
-const unsigned long TOUCH_HOLD_MS = 150;  // 觸控要穩定碰住 150ms 才算一次，還是太敏感就調大（例如 250）
+const unsigned long TOUCH_HOLD_MS = 80;   // 觸控要穩定碰住 80ms 才算一次，還是太敏感就調大（例如 120）
 const bool BUTTON_IS_TOUCH = true;  // true = TTP223 觸控模組（碰到輸出 HIGH）；false = 實體按鈕（按下接 GND）
 
 // ---- PWM ----
@@ -547,34 +547,37 @@ void handleButtonAction(ButtonAction action) {
 // 觸控模組碰到是 HIGH、實體按鈕按下是 LOW，統一換成「按下 = true」
 bool buttonDown() { return digitalRead(PIN_BUTTON) == (BUTTON_IS_TOUCH ? HIGH : LOW); }
 
-// 短按要等 350ms 確認不是連按兩下才執行
+// 短按要等一下確認不是連按兩下才執行；第二下一按到就判定為連按兩下（不用等放開）
 void updateButton() {
   static bool lastRaw = HIGH, stable = HIGH, longFired = false, pendingShort = false;
   static unsigned long changedMs = 0, pressedMs = 0, releasedMs = 0;
-  const unsigned long DOUBLE_MS = BUTTON_IS_TOUCH ? 500 : 350;  // 觸控判斷較慢，連碰兩下的間隔放寬
+  const unsigned long DOUBLE_MS = BUTTON_IS_TOUCH ? 450 : 350;          // 放開後多久內再按一次算連按兩下
+  const unsigned long PRESS_MS = BUTTON_IS_TOUCH ? TOUCH_HOLD_MS : 30;  // 按下要穩定多久才算（觸控濾掉擦過的誤觸）
+  const unsigned long RELEASE_MS = 30;                                  // 放開只要短暫去彈跳
   bool raw = buttonDown() ? LOW : HIGH;  // 下面沿用「LOW = 按下」的判斷
   if (raw != lastRaw) {
     lastRaw = raw;
     changedMs = millis();
   }
-  if (pendingShort && stable == HIGH && millis() - releasedMs >= DOUBLE_MS) {
+  // 手指還放著（第二下確認中）就先不要當成短按
+  if (pendingShort && stable == HIGH && raw == HIGH && millis() - releasedMs >= DOUBLE_MS) {
     pendingShort = false;
     handleButtonAction(BTN_SHORT);
   }
-  if (millis() - changedMs < (BUTTON_IS_TOUCH ? TOUCH_HOLD_MS : 30)) return;  // 去彈跳；觸控要碰住一段時間才算，濾掉擦過的誤觸
-  if (raw != stable) {
+  if (raw != stable && millis() - changedMs >= (raw == LOW ? PRESS_MS : RELEASE_MS)) {
     stable = raw;
     if (stable == LOW) {
-      pressedMs = millis();
-      longFired = false;
-    } else if (!longFired) {
-      if (pendingShort && millis() - releasedMs < DOUBLE_MS) {
+      if (pendingShort && millis() - releasedMs < DOUBLE_MS + PRESS_MS) {
         pendingShort = false;
+        longFired = true;  // 這一下已經用掉，放開和長按都不再觸發
         handleButtonAction(BTN_DOUBLE);
       } else {
-        pendingShort = true;
-        releasedMs = millis();
+        pressedMs = millis();
+        longFired = false;
       }
+    } else if (!longFired) {
+      pendingShort = true;
+      releasedMs = millis();
     }
   }
   if (stable == LOW && !longFired && millis() - pressedMs >= 1500) {
