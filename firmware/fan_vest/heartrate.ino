@@ -1,5 +1,6 @@
-// 心率感測（MAX30102，I2C 位址 0x57，和 INA219 共用 GPIO21/22）與心率過高警報
-// 需要的函式庫：SparkFun MAX3010x Pulse and Proximity Sensor Library
+// 心率感測與心率過高警報。兩種感測器擇一（fan_vest.ino 的 HR_ANALOG）：
+//   類比 PulseSensor：S 接 GPIO34，另開一個 FreeRTOS 工作每 2ms 取樣，不受 loop() 卡住影響
+//   MAX30102：I2C 位址 0x57，和 INA219 共用 GPIO21/22（需要 SparkFun MAX3010x 函式庫）
 // 感測器要貼著皮膚（例如縫在領口內側貼脖子），動作太大時讀值會不穩，只當作參考與提醒
 
 const uint32_t HR_CONTACT_IR = 50000;              // 紅外線反射低於此值 = 沒貼到皮膚
@@ -19,6 +20,10 @@ unsigned long hrNoContactSince = 0;
 unsigned long hrSampleNo = 0, hrLastBeatNo = 0, hrLastBeatMs = 0, hrHighSince = 0, hrLastBeepMs = 0;
 
 void setupHeartRate() {
+  if (HR_ANALOG) {
+    setupPulseAnalog();
+    return;
+  }
   hrFound = pulse.begin(Wire, I2C_SPEED_STANDARD);
   if (!hrFound) {
     Serial.println("找不到 MAX30102，心率感測停用");
@@ -47,6 +52,10 @@ void resetHeartRate() {
 
 // 每次 loop() 都要呼叫：感測器內部只暫存幾筆資料，太久沒讀會漏掉
 void updateHeartRate() {
+  if (HR_ANALOG) {
+    updatePulseAnalog();
+    return;
+  }
   if (!hrFound) return;
   pulse.check();
   while (pulse.available()) {
@@ -81,6 +90,83 @@ void updateHeartRate() {
   }
   if (hrBpm && millis() - hrLastBeatMs > HR_STALE_MS) resetHeartRate();
   if (!hrContact && hrNoContactSince && millis() - hrNoContactSince >= HR_IDLE_MS) setHeartRateLowPower(true);
+}
+
+// ---------- 類比 PulseSensor ----------
+// 依 PulseSensor 官方演算法：追蹤波峰與波谷、門檻設在振幅一半，訊號往上穿過門檻就是一次心跳。
+// 原版是 10 位元 ADC，這裡換算成 ESP32 的 12 位元（中點約 2048）。
+const int PS_SAMPLE_MS = 2;
+const int PS_MID = 2048, PS_THRESH0 = 2100;   // 沒訊號時的初始門檻
+const int PS_MIN_AMP = 120;                   // 振幅低於此值當作沒貼到皮膚（雜訊）
+const int PS_AVG_N = 8;                       // 用最近 8 次心跳間隔平均
+volatile int psBpm = 0, psAmp = 0;            // 由取樣工作更新，loop() 讀取
+volatile unsigned long psLastBeatMs = 0;
+
+void pulseTask(void*) {
+  int P = PS_MID, T = PS_MID, thresh = PS_THRESH0, ibi = 600;
+  int rates[PS_AVG_N], beats = 0;
+  bool inPulse = false;
+  unsigned long t = 0, lastBeat = 0;
+  TickType_t wake = xTaskGetTickCount();
+  for (;;) {
+    vTaskDelayUntil(&wake, pdMS_TO_TICKS(PS_SAMPLE_MS));
+    int s = analogRead(PIN_PULSE);
+    t += PS_SAMPLE_MS;
+    unsigned long n = t - lastBeat;
+    if (s < thresh && n > (unsigned long)ibi * 3 / 5 && s < T) T = s;  // 波谷（避開重搏波）
+    if (s > thresh && s > P) P = s;                                    // 波峰
+    if (n > 250 && s > thresh && !inPulse && n > (unsigned long)ibi * 3 / 5) {
+      inPulse = true;
+      int gap = t - lastBeat;
+      lastBeat = t;
+      if (beats == 0) {  // 第一下只用來對時
+        beats = 1;
+        continue;
+      }
+      ibi = gap;
+      if (ibi < 270 || ibi > 1700) continue;  // 超過 35～220 bpm 當作雜訊
+      if (beats < PS_AVG_N + 1) {
+        rates[beats - 1] = ibi;
+        beats++;
+      } else {
+        memmove(rates, rates + 1, sizeof(int) * (PS_AVG_N - 1));
+        rates[PS_AVG_N - 1] = ibi;
+      }
+      psLastBeatMs = millis();
+      if (beats == PS_AVG_N + 1) {
+        long sum = 0;
+        for (int i = 0; i < PS_AVG_N; i++) sum += rates[i];
+        psBpm = 60000L * PS_AVG_N / sum;
+      }
+    }
+    if (s < thresh && inPulse) {  // 一次心跳結束：依振幅重設門檻
+      inPulse = false;
+      psAmp = P - T;
+      thresh = psAmp / 2 + T;
+      P = T = thresh;
+    }
+    if (n > 2500) {  // 2.5 秒沒心跳：重新開始
+      thresh = PS_THRESH0;
+      P = T = PS_MID;
+      lastBeat = t;
+      beats = 0;
+      psBpm = 0;
+      psAmp = 0;
+    }
+  }
+}
+
+void setupPulseAnalog() {
+  analogReadResolution(12);
+  analogSetPinAttenuation(PIN_PULSE, ADC_11db);  // 0～3.3V 全範圍
+  hrFound = true;  // 類比感測器無法偵測有沒有接，沒接時會顯示「沒貼到皮膚」
+  xTaskCreatePinnedToCore(pulseTask, "pulse", 3072, nullptr, 2, nullptr, 1);
+}
+
+void updatePulseAnalog() {
+  hrContact = psAmp >= PS_MIN_AMP && millis() - psLastBeatMs < HR_STALE_MS;
+  hrBpm = hrContact ? psBpm : 0;
+  if (hrBpm) hrPeak = max(hrPeak, hrBpm);
 }
 
 // 每秒呼叫一次：心率持續高於門檻就響蜂鳴器。這是安全警報，蜂鳴器設定關閉時也會響

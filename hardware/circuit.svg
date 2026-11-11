@@ -133,17 +133,14 @@
   <text x="715" y="532" text-anchor="middle" class="s13">PWM</text>
   <path d="M460 780 V800" class="w gnd"/><use href="#gnd" x="460" y="800"/>
 
-  <!-- MAX30102 心率（I2C，與 INA219 共用 GPIO21／22） -->
+  <!-- 類比心率感測器（PulseSensor），S 接 GPIO34 -->
   <rect x="640" y="610" width="230" height="110" rx="10" fill="#fce4ec" class="box"/>
-  <text x="755" y="640" text-anchor="middle" class="s16 b">MAX30102</text>
-  <text x="755" y="660" text-anchor="middle" class="s13">心率感測器（貼皮膚）</text>
-  <text x="755" y="700" text-anchor="middle" class="s13">VCC 接 3V3、GND 共地</text>
-  <path d="M560 650 H640" class="w sig"/>
-  <path d="M560 675 H640" class="w sig" stroke-dasharray="7 5"/>
-  <text x="550" y="655" text-anchor="end" class="s14">GPIO21</text>
-  <text x="550" y="680" text-anchor="end" class="s14">GPIO22</text>
-  <text x="600" y="645" text-anchor="middle" class="s13">SDA</text>
-  <text x="600" y="694" text-anchor="middle" class="s13">SCL</text>
+  <text x="755" y="640" text-anchor="middle" class="s16 b">心率感測器</text>
+  <text x="755" y="660" text-anchor="middle" class="s13">類比 PulseSensor（貼皮膚）</text>
+  <text x="755" y="700" text-anchor="middle" class="s13">+ 接 3V3、− 接 GND</text>
+  <path d="M560 665 H640" class="w sig"/>
+  <text x="550" y="670" text-anchor="end" class="s14">GPIO34</text>
+  <text x="600" y="657" text-anchor="middle" class="s13">S</text>
 
   <!-- DHT11 -->
   <rect x="40" y="400" width="190" height="120" rx="10" fill="#eef8ee" class="box"/>
@@ -173,10 +170,11 @@
 
   <!-- 按鈕 -->
   <rect x="40" y="710" width="190" height="60" rx="10" fill="#fffde7" class="box"/>
-  <text x="60" y="737" class="s16 b">按鈕</text>
-  <text x="60" y="757" class="s13">另一腳接 GND</text>
+  <text x="60" y="737" class="s16 b">觸控模組</text>
+  <text x="60" y="757" class="s13">TTP223（S 腳）</text>
+  <text x="220" y="745" text-anchor="end" class="s13">S</text>
   <path d="M230 740 H360" class="w sig"/>
-  <text x="295" y="812" text-anchor="middle" class="s13">蜂鳴器、WS2812B 的 VCC 接 3V3、GND 共地</text>
+  <text x="295" y="812" text-anchor="middle" class="s13">蜂鳴器、WS2812B、觸控模組的 VCC 接 3V3、GND 共地</text>
 
   <g>
     <circle cx="240" cy="150" r="5" class="pin"/><circle cx="240" cy="190" r="5" class="pin"/><circle cx="240" cy="280" r="5" class="pin"/>
@@ -191,6 +189,6 @@
   <rect x="40" y="840" width="1120" height="135" rx="10" fill="#fffaf0" stroke="#c9a227" stroke-width="2" stroke-dasharray="8 5"/>
   <text x="60" y="870" class="s16 b">接線重點</text>
   <text x="60" y="897" class="s14">① 電池調速固定在最高段，轉速由 ESP32 的 PWM 控制。　② 所有 GND 必須共地：ESP32、Q1、Q2、電池 DC− 接在一起。</text>
-  <text x="60" y="922" class="s14">③ 腳位與 fan_vest.ino 一致：GPIO25／26 = 上方／下方 PWM、GPIO4 = DHT11、GPIO21／22 = INA219＋MAX30102、GPIO14 = 蜂鳴器、GPIO32 = 燈、GPIO33 = 按鈕。</text>
-  <text x="60" y="947" class="s14">④ 四顆風扇用 DC 一分二線分成上方、下方兩組；每組一個 D4184 和一顆 1N5819。　⑤ 沒接 INA219、MAX30102、蜂鳴器或燈也能運作。</text>
+  <text x="60" y="922" class="s14">③ 腳位與 fan_vest.ino 一致：GPIO25／26 = 上方／下方 PWM、GPIO4 = DHT11、GPIO21／22 = INA219、GPIO34 = 心率、GPIO14 = 蜂鳴器、GPIO32 = 燈、GPIO33 = 觸控模組。</text>
+  <text x="60" y="947" class="s14">④ 四顆風扇用 DC 一分二線分成上方、下方兩組；每組一個 D4184 和一顆 1N5819。　⑤ 沒接 INA219、心率感測器、蜂鳴器或燈也能運作。</text>
 </svg>

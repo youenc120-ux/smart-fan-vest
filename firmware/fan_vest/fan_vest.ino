@@ -8,12 +8,14 @@
 // 接線：
 //   GPIO25 -> 上方 D4184 PWM、GPIO26 -> 下方 D4184 PWM（兩個模組 GND 都接 ESP32 GND）
 //   GPIO4  -> DHT11 DATA（模組版已內建上拉；裸元件 DATA 與 3.3V 之間接 10kΩ）
-//   GPIO21/22 -> INA219 SDA/SCL（VIN+ 接保險絲後的 +12V，VIN- 接風扇正極），MAX30102 心率模組也接同兩條線
-//   GPIO14 -> 主動式蜂鳴器、GPIO32 -> WS2812B DIN、GPIO33 -> 按鈕（另一端接 GND）
+//   GPIO21/22 -> INA219 SDA/SCL（VIN+ 接保險絲後的 +12V，VIN- 接風扇正極）；改用 MAX30102 時也接同兩條線
+//   GPIO34 -> 類比心率感測器 S（+ 接 3V3、− 接 GND）
+//   GPIO14 -> 主動式蜂鳴器、GPIO32 -> WS2812B DIN、GPIO33 -> 觸控模組 S（TTP223，VCC 接 3V3）；改用實體按鈕時另一端接 GND，並把 BUTTON_IS_TOUCH 改成 false
 //   3V3 -> DHT11、INA219、MAX30102、WS2812B、蜂鳴器 VCC
 //
 // 按鈕：短按 = 自動 → 手動 30% → 60% → 100% → 關閉 → 自動；連按兩下 = 切換情境模式；
-//       長按 1.5 秒 = 靜音警報（中暑、心率）並解除過電流保護；開機時按住按鈕 = 進入無線更新（OTA）模式
+//       長按 1.5 秒 = 靜音警報（中暑、心率）並解除過電流保護；開機時按住實體按鈕 = 進入無線更新（OTA）模式
+//       （觸控模組開機時會把手指當成背景校正掉，所以觸控版請從手機「診斷」進入 OTA）
 //
 // 分檔：fan_vest.ino（主程式、BLE）、features.ino（情境模式、喝水提醒、偏好學習、開機自我檢測）、heartrate.ino（心率）、ota.ino（無線更新）
 // 燒錄設定：Partition Scheme 選「Minimal SPIFFS (1.9MB APP with OTA)」，程式才放得下
@@ -52,11 +54,14 @@
 #include <MAX30105.h>
 #include <heartRate.h>
 
+// ---- 心率感測器型號 ----
+const bool HR_ANALOG = true;  // true = 類比 PulseSensor（心形 LED、S／+／− 三條線）；false = MAX30102（I2C）
+
 // ---- 感測器型號：換 DHT22 只要改這行，接線相同 ----
 #define DHT_TYPE DHT11
 
 // ---- 版本 ----
-const uint8_t FW_MAJOR = 1, FW_MINOR = 2;
+const uint8_t FW_MAJOR = 1, FW_MINOR = 3;
 
 // ---- 藍牙（名稱會加上晶片編號後 4 碼，例如 FanVest-3A7F，團隊模式才分得出誰是誰） ----
 const char* BLE_NAME = "FanVest";
@@ -78,6 +83,8 @@ const int PIN_SCL       = 22;
 const int PIN_BUZZER    = 14;
 const int PIN_LED       = 32;
 const int PIN_BUTTON    = 33;
+const int PIN_PULSE     = 34;   // 類比心率感測器 S（只能用 ADC1 的腳：32～39，34 是純輸入腳）
+const bool BUTTON_IS_TOUCH = true;  // true = TTP223 觸控模組（碰到輸出 HIGH）；false = 實體按鈕（按下接 GND）
 
 // ---- PWM ----
 const int PWM_FREQ = 20000;  // 20kHz 聽不到嗡嗡聲；風扇轉不順可改 1000 試試
@@ -536,12 +543,15 @@ void handleButtonAction(ButtonAction action) {
   publishStatus();
 }
 
+// 觸控模組碰到是 HIGH、實體按鈕按下是 LOW，統一換成「按下 = true」
+bool buttonDown() { return digitalRead(PIN_BUTTON) == (BUTTON_IS_TOUCH ? HIGH : LOW); }
+
 // 短按要等 350ms 確認不是連按兩下才執行
 void updateButton() {
   static bool lastRaw = HIGH, stable = HIGH, longFired = false, pendingShort = false;
   static unsigned long changedMs = 0, pressedMs = 0, releasedMs = 0;
   const unsigned long DOUBLE_MS = 350;
-  bool raw = digitalRead(PIN_BUTTON);
+  bool raw = buttonDown() ? LOW : HIGH;  // 下面沿用「LOW = 按下」的判斷
   if (raw != lastRaw) {
     lastRaw = raw;
     changedMs = millis();
@@ -758,7 +768,7 @@ void setup() {
   ledcWrite(PIN_FAN_LOWER, 0);
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
+  pinMode(PIN_BUTTON, BUTTON_IS_TOUCH ? INPUT_PULLDOWN : INPUT_PULLUP);  // 沒接時都當作沒按
   led.begin();
   led.setBrightness(40);  // 太亮會刺眼也耗電
   led.show();
@@ -766,9 +776,9 @@ void setup() {
   loadSettings();
 
   // 開機時按住按鈕：進入無線更新模式（不啟動藍牙，風扇保持停止）
-  if (digitalRead(PIN_BUTTON) == LOW) {
+  if (buttonDown()) {
     delay(50);
-    if (digitalRead(PIN_BUTTON) == LOW) startOta();
+    if (buttonDown()) startOta();
   }
 
   dht.begin();
