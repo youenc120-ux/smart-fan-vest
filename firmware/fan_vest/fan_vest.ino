@@ -84,16 +84,17 @@ const int PIN_BUZZER    = 14;
 const int PIN_LED       = 32;
 const int PIN_BUTTON    = 33;
 const int PIN_PULSE     = 34;   // 類比心率感測器 S（只能用 ADC1 的腳：32～39，34 是純輸入腳）
+const unsigned long TOUCH_HOLD_MS = 150;  // 觸控要穩定碰住 150ms 才算一次，還是太敏感就調大（例如 250）
 const bool BUTTON_IS_TOUCH = true;  // true = TTP223 觸控模組（碰到輸出 HIGH）；false = 實體按鈕（按下接 GND）
 
 // ---- PWM ----
-const int PWM_FREQ = 20000;  // 20kHz 聽不到嗡嗡聲；風扇轉不順可改 1000 試試
+const int PWM_FREQ = 1000;   // D4184 用 3.3V 推動時，20kHz 開關太慢、風扇要 90% 才轉；1kHz 才推得動（可能有輕微嗡嗡聲）
 const int PWM_RES  = 8;      // 0~255
 
 // ---- 風扇參數 ----
 const int DUTY_MIN = 30;           // 風扇能穩定轉動的最低轉速 %，實測後調整
 const int SENSOR_FAIL_PCT = 70;    // 感測器故障時的轉速，寧可吹也不要停
-const unsigned long KICK_MS = 500; // 從停止啟動時先全速轉一下，避免低速轉不起來
+const unsigned long KICK_MS = 1000; // 從停止啟動時先全速轉 1 秒，避免低速轉不起來
 const float RAMP_PCT_PER_S = 60;   // 平滑調速：每秒最多改變幾 %，避免風聲突然變大
 
 // ---- 溫度讀取 ----
@@ -550,7 +551,7 @@ bool buttonDown() { return digitalRead(PIN_BUTTON) == (BUTTON_IS_TOUCH ? HIGH : 
 void updateButton() {
   static bool lastRaw = HIGH, stable = HIGH, longFired = false, pendingShort = false;
   static unsigned long changedMs = 0, pressedMs = 0, releasedMs = 0;
-  const unsigned long DOUBLE_MS = 350;
+  const unsigned long DOUBLE_MS = BUTTON_IS_TOUCH ? 500 : 350;  // 觸控判斷較慢，連碰兩下的間隔放寬
   bool raw = buttonDown() ? LOW : HIGH;  // 下面沿用「LOW = 按下」的判斷
   if (raw != lastRaw) {
     lastRaw = raw;
@@ -560,7 +561,7 @@ void updateButton() {
     pendingShort = false;
     handleButtonAction(BTN_SHORT);
   }
-  if (millis() - changedMs < 30) return;  // 去彈跳
+  if (millis() - changedMs < (BUTTON_IS_TOUCH ? TOUCH_HOLD_MS : 30)) return;  // 去彈跳；觸控要碰住一段時間才算，濾掉擦過的誤觸
   if (raw != stable) {
     stable = raw;
     if (stable == LOW) {
