@@ -13,8 +13,8 @@
 //   GPIO14 -> 主動式蜂鳴器、GPIO32 -> WS2812B DIN、GPIO33 -> 觸控模組 S（TTP223，VCC 接 3V3）；改用實體按鈕時另一端接 GND，並把 BUTTON_IS_TOUCH 改成 false
 //   3V3 -> DHT11、INA219、MAX30102、WS2812B、蜂鳴器 VCC
 //
-// 按鈕：短按 = 自動 → 手動 30% → 60% → 100% → 關閉 → 自動；連按兩下 = 切換情境模式；
-//       長按 1.5 秒 = 靜音警報（中暑、心率）並解除過電流保護；開機時按住實體按鈕 = 進入無線更新（OTA）模式
+// 按鈕：長按 1.5 秒 = 自動 ↔ 手動；短按 = 手動模式下 30% → 60% → 100% → 關閉（有警示時先確認警示：
+//       靜音中暑與心率警報、確認喝水提醒、解除過電流保護）；連按兩下 = 切換情境模式；開機時按住實體按鈕 = 進入無線更新（OTA）模式
 //       （觸控模組開機時會把手指當成背景校正掉，所以觸控版請從手機「診斷」進入 OTA）
 //
 // 分檔：fan_vest.ino（主程式、BLE）、features.ino（情境模式、喝水提醒、偏好學習、開機自我檢測）、heartrate.ino（心率）、ota.ino（無線更新）
@@ -512,33 +512,41 @@ void updateLed() {
 }
 
 // ---------- 按鈕 ----------
+// 有還沒確認的警示（中暑、心率、過電流、喝水）時，輕碰一下先確認警示，不會改風速
+bool acknowledgeAlerts() {
+  bool pending = (heatAlert && !alarmMuted) || (hrAlert && !hrMuted) || overcurrentTripped || hydrateDue;
+  if (!pending) return false;
+  alarmMuted = heatAlert;
+  hrMuted = hrAlert;
+  overcurrentTripped = false;
+  acknowledgeHydrate();
+  beep(BEEP_DOUBLE, 3);
+  return true;
+}
+
 void handleButtonAction(ButtonAction action) {
   if (action == BTN_LONG) {
-    alarmMuted = heatAlert;
-    hrMuted = hrAlert;
-    overcurrentTripped = false;
-    acknowledgeHydrate();
-    beep(BEEP_DOUBLE, 3);
+    // 長按：自動 ↔ 手動
+    autoMode = !autoMode;
+    autoFanOn = false;
+    if (!autoMode && manualUpper == 0 && manualLower == 0) manualUpper = manualLower = 60;  // 手動從 0% 開始會像沒反應
+    if (autoMode) beep(BEEP_DOUBLE, 3);  // 嗶嗶 = 自動
+    else beep(BEEP_CHIRP, 1);            // 嗶 = 手動
+    markDirty();
   } else if (action == BTN_DOUBLE) {
     applyProfile((cfg.profile + 1) % PROFILE_COUNT);
     for (int i = 0; i <= cfg.profile; i++) beep(BEEP_CHIRP, 1);  // 只會聽到一聲，燈號與手機會顯示目前情境
     publishSettings();
     markDirty();
-  } else {
-    // 自動 → 手動 30% → 60% → 100% → 關閉 → 自動
-    static const int STEPS[] = {30, 60, 100, 0};
-    static int step = -1;
-    if (autoMode) {
-      autoMode = false;
-      step = 0;
-    } else if (++step >= 4) {
-      autoMode = true;
-      autoFanOn = false;
-      step = -1;
+  } else if (!acknowledgeAlerts()) {
+    // 輕碰：手動模式下 30% → 60% → 100% → 關閉 → 30%；自動模式下只回應一聲
+    if (!autoMode) {
+      int cur = max(manualUpper, manualLower);
+      int next = cur < 30 ? 30 : cur < 60 ? 60 : cur < 100 ? 100 : 0;
+      manualUpper = manualLower = next;
+      markDirty();
     }
-    if (!autoMode) manualUpper = manualLower = STEPS[step];
     beep(BEEP_CHIRP, 1);
-    markDirty();
   }
   applyFans();
   publishStatus();
