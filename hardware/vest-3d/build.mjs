@@ -22,25 +22,43 @@ const HEIGHT = 560;
 const T0 = 26, T1 = 28, T2 = 35, DUTY_MIN = 30, BOOST = 10;
 const HR_HIGH = 150;
 
-// ---------- 世界座標（約 1 單位 = 3mm；z 向上） ----------
-const BASE = { x: -104, y: -84, w: 208, d: 168, r: 12 };
+// ---------- 世界座標（約 1 單位 = 3mm；z 向上；觀看方向來自 +x、+y） ----------
+const { tubePieces, tubeSvg } = await import(pathToFileURL(join(KIT, "kit/tube.mjs")).href);
+const BASE = { x: -108, y: -88, w: 216, d: 176, r: 14 };
 const BASE_H = 12, FOOT_H = 5;
-const TORSO = { x: -66, y: -32, w: 132, d: 64, r: 26 };
-const HIP = 66, SHOULDER = 206;
-const BACK = TORSO.y + TORSO.d;        // 背面（朝向觀看者的 +y 面）
-const SIDE = TORSO.x + TORSO.w;        // 右側（朝向觀看者的 +x 面）
-const NECK_R = 21;
+const HIP = 70;                                   // 背心下擺
+const HEM_H = 9;                                  // 羅紋下擺
+const TOP = 168;                                  // 背心肩線（身體頂面）
+const TORSO = { x: -66, y: -32, w: 132, d: 64, r: 18 };
+const HEM = { x: -67.2, y: -33.2, w: 134.4, d: 66.4, r: 19 };
+const BACK = TORSO.y + TORSO.d;                   // 背面（朝向觀看者的 +y 面）
+const SIDE = TORSO.x + TORSO.w;                   // 右側（朝向觀看者的 +x 面）
+const STRAP_R = { x: 20, y: -26, w: 36, d: 52, r: 12 };
+const STRAP_L = { x: -56, y: -26, w: 36, d: 52, r: 12 };
+const YOKE = { x: -61, y: -27, w: 122, d: 54, r: 22 };   // 肩部（圓弧收邊）
+const STRAP_TOP = TOP + 9;                             // 肩部頂面
+const COLLAR = { x: -20, y: 10, w: 40, d: 18, r: 6 };
+const COLLAR_TOP = STRAP_TOP + 7;
+const MQ = { x: -78, y: -26, w: 156, d: 52, r: 24 };   // 人台肩膀
+const MQ_TOP = COLLAR_TOP;
+const NECK = [0, -4], NECK_R = 13, NECK_TOP = 214;
 const FANS = [
-  { id: "f1", x: -30, z: 166, zone: "upper" },
-  { id: "f2", x: 30, z: 166, zone: "upper" },
-  { id: "f3", x: -30, z: 104, zone: "lower" },
-  { id: "f4", x: 30, z: 104, zone: "lower" },
+  { id: "f1", x: -32, z: 146, zone: "upper" },
+  { id: "f2", x: 32, z: 146, zone: "upper" },
+  { id: "f3", x: -32, z: 98, zone: "lower" },
+  { id: "f4", x: 32, z: 98, zone: "lower" },
 ];
 const FAN_R = 19, FAN_T = 6, BLADES = 9, PHASES = 24;
+const GLAND_L = 2.4, GLAND_R = 1.9, CABLE_R = 1.15;
+const BOX = { x: SIDE, y: -14, w: 13, d: 28, r: 2.4 };
+const BOX_Z = 84, BOX_H = 36;
+const BATT = { x: 54, y: -76, w: 34, d: 46, r: 6 };
+const BATT_H = 17;
+const PHONE = { x: -90, y: 18, w: 34, d: 62, r: 5 };
 
 const P = k.fitProjection(
-  [...k.boxCorners(BASE, -BASE_H - FOOT_H, 0), ...k.boxCorners(TORSO, HIP, SHOULDER + 10), [0, BACK + FAN_T + 4, 180], [SIDE + 22, 0, 90], [0, -6, SHOULDER + 40]],
-  WIDTH, HEIGHT, { pad: 34, azimuth: 38 },
+  [...k.boxCorners(BASE, -BASE_H - FOOT_H, 0), ...k.boxCorners(TORSO, HIP, MQ_TOP), [0, BACK + FAN_T + 4, 160], [SIDE + 16, 0, 100], [NECK[0], NECK[1], NECK_TOP + 8]],
+  WIDTH, HEIGHT, { pad: 30, azimuth: 38 },
 );
 
 const at = (p) => k.iso(p, P);
@@ -49,87 +67,121 @@ const L = (d, style) => k.lineSvg(d, style);
 const D = (points, style) => k.dotsSvg(points, style);
 const path3 = (pts, closed = false) => k.pathOf(pts.map(at), closed);
 const titled = (name, inner, extra = "") => `<g data-part="${name.id}"${extra}><title>${name.zh}</title>${inner}</g>`;
+const byDepth = (list, pos) => [...list].sort((a, b) => k.depthOf(pos(a), P) - k.depthOf(pos(b), P));
+const cable = (points, { r = CABLE_R, bend = 4, tone = "hi" } = {}) =>
+  tubePieces(G.fillet(points, bend, 7, { P, tube: r }), r, P, { maxLength: 14 }).map((piece) => tubeSvg(piece, { tone })).join("");
 
 // ---------- 展示底座 ----------
 function base() {
   const out = [`<path class="iso-halo" d="${k.haloOf(BASE, -BASE_H - FOOT_H, BASE_H, P)}"/>`];
-  const feet = [...k.corners(BASE, 22)].sort((a, b) => k.depthOf([a[0], a[1], 0], P) - k.depthOf([b[0], b[1], 0], P));
-  for (const [x, y] of feet) {
-    out.push(S(k.cylinder(x, y, 8, -BASE_H - FOOT_H, 1.6, P, 28), { tone: "lo" }));
-    out.push(S(k.cylinder(x, y, 6, -BASE_H - FOOT_H + 1.6, FOOT_H - 1.6, P, 28), { tone: "mid" }));
+  for (const [x, y] of byDepth(k.corners(BASE, 24), ([x, y]) => [x, y, 0])) {
+    out.push(S(k.cylinder(x, y, 8.5, -BASE_H - FOOT_H, 1.6, P, 28), { tone: "lo" }));
+    out.push(S(k.cylinder(x, y, 6.4, -BASE_H - FOOT_H + 1.6, FOOT_H - 1.6, P, 28), { tone: "mid" }));
   }
-  out.push(S(k.slabOf(BASE, -BASE_H, BASE_H, P, 8, 1.6), { tone: "mid" }));
+  out.push(S(k.slabOf(BASE, -BASE_H, BASE_H, P, 8, 1.6), { tone: "mid", inner: L(k.sideSeam(BASE, -BASE_H + 4, P), { tone: "faint" }) }));
   out.push(L(k.planOutline(k.insetPlan(BASE, 6), 0, P), { tone: "lo" }));
   const screws = k.corners(BASE, 11);
   out.push(L(screws.map(([x, y]) => k.ring(x, y, 2.4, 0, P, 16)).join(""), { tone: "lo" }));
   out.push(D(screws.map(([x, y]) => at([x, y, 0])), { size: 0.5 }));
   // 前緣刻度尺
-  const strip = { x: -86, y: BASE.y + BASE.d - 17, w: 172, d: 7, r: 1 };
+  const strip = { x: -90, y: BASE.y + BASE.d - 17, w: 180, d: 7, r: 1 };
   out.push(S(k.slabOf(strip, 0, 0.6, P, 3), { tone: "lo", crease: "none" }));
   const ticks = k.topTicks(strip.x + 4, strip.x + strip.w - 4, 4, 5, strip.y + 0.8, 0.6, [2, 3.6], P);
   out.push(L(ticks.minor, { tone: "lo" }), L(ticks.major, { tone: "mid" }));
   out.push(D([at([strip.x + 2, strip.y + 3.5, 0.6]), at([strip.x + strip.w - 2, strip.y + 3.5, 0.6])], { size: 0.45 }));
   // 銘牌
-  const plate = { x: -90, y: -72, w: 46, d: 22, r: 2 };
+  const plate = { x: -94, y: -76, w: 50, d: 24, r: 2 };
   out.push(S(k.slabOf(plate, 0, 1, P, 3, 0.4), { tone: "mid" }));
-  for (const [i, w] of [[0, 30], [1, 22], [2, 26]]) out.push(L(k.lineOnTop([plate.x + 6, plate.y + 7 + i * 4.4], [plate.x + 6 + w, plate.y + 7 + i * 4.4], 1, P), { tone: "faint", free: "both" }));
-  out.push(D(k.corners(plate, 2.6).map(([x, y]) => at([x, y, 1])), { size: 0.4 }));
+  out.push(L(k.planOutline(k.insetPlan(plate, 2), 1, P, 3), { tone: "faint" }));
+  for (const [i, w] of [[0, 32], [1, 22], [2, 27]]) out.push(L(k.lineOnTop([plate.x + 6, plate.y + 7.5 + i * 4.6], [plate.x + 6 + w, plate.y + 7.5 + i * 4.6], 1, P), { tone: "faint", free: "both" }));
+  out.push(D(k.corners(plate, 3.4).map(([x, y]) => at([x, y, 1])), { size: 0.4 }));
   return out.join("");
 }
 
 // ---------- 支架 ----------
 function stand() {
   const out = [];
-  out.push(S(k.cylinder(0, 0, 16, 0, 3, P, 40, 0.6), { tone: "mid" }));
-  out.push(D(G.dotsOf(G.frameAlong([0, 0, 3], [0, 0, 1]), 0, 12, 4, P, { all: true }), { size: 0.45 }));
-  out.push(S(k.cylinder(0, 0, 5, 3, HIP - 3, P, 24), { tone: "mid", crease: "none" }));
-  out.push(L([24, 44].map((z) => k.sideArc(0, 0, 5, z, P, 14)).join(""), { tone: "faint" }));
+  const flange = G.frameAlong([0, 0, 0], [0, 0, 1]);
+  out.push(S(k.cylinder(0, 0, 18, 0, 3.2, P, 48, 0.6), { tone: "mid" }));
+  out.push(D(G.dotsOf(G.frameAlong([0, 0, 3.2], [0, 0, 1]), 0, 13.5, 6, P, { all: true }), { size: 0.45 }));
+  out.push(L(k.ring(0, 0, 8, 3.2, P, 32), { tone: "faint" }));
+  out.push(S(k.cylinder(0, 0, 5, 3.2, 30, P, 24), { tone: "mid", crease: "none" }));
+  out.push(S(k.cylinder(0, 0, 8, 33.2, 8, P, 32, 0.5), { tone: "mid" }));             // 高度調整套環
+  out.push(L(k.knurl(0, 0, 8, 34.4, 40, 32, P), { tone: "lo" }));
+  const screw = G.frameAlong([8, 0, 37.2], [1, 0, 0]);
+  out.push(S(G.disc(0, 3, 2, screw, P), { tone: "mid" }));
+  out.push(S(G.disc(3, 7, 3.2, screw, P), { tone: "mid" }));
+  out.push(L(G.ribsOf(screw, 3, 7, 3.2, 16, P, { seams: true }).d || "", { tone: "lo" }));
+  out.push(S(k.cylinder(0, 0, 4, 41.2, HIP - 6 - 41.2, P, 24), { tone: "mid", crease: "none" }));
+  out.push(S(k.cylinder(0, 0, 14, HIP - 6, 4, P, 40, 0.5), { tone: "mid" }));          // 人台座
+  void flange;
   return out.join("");
 }
 
-// ---------- 背心本體 ----------
+// ---------- 肩部與領口 ----------
+function yoke() {
+  const out = [];
+  out.push(S(k.slabOf(YOKE, TOP, STRAP_TOP - TOP, P, 10, 2.2), { tone: "mid", inner: L(k.sideSeam(YOKE, TOP + 3, P, 10), { tone: "faint" }) }));
+  out.push(L(k.planOutline(k.insetPlan(YOKE, 4), STRAP_TOP, P, 8), { tone: "faint" }));     // 肩部壓線
+  // 左右肩線：從領口到肩端
+  out.push(L(k.lineOnTop([NECK[0] + 23, NECK[1]], [YOKE.x + YOKE.w - 4, NECK[1]], STRAP_TOP, P) + k.lineOnTop([NECK[0] - 23, NECK[1]], [YOKE.x + 4, NECK[1]], STRAP_TOP, P), { tone: "lo" }));
+  return out.join("");
+}
+function collarRing() {
+  const [x, y] = NECK;
+  const out = [];
+  out.push(S(k.cylinder(x, y, 23, STRAP_TOP, COLLAR_TOP - STRAP_TOP, P, 56, 0.6), { tone: "mid" }));
+  out.push(L(k.knurl(x, y, 23, STRAP_TOP + 1, COLLAR_TOP - 1, 72, P, 0.3), { tone: "lo" }));          // 羅紋領
+  out.push(S(k.cylinder(x, y, 17, COLLAR_TOP, 0.2, P, 48), { tone: "lo", flat: true }));
+  out.push(L(k.ring(x, y, 20, COLLAR_TOP, P, 48), { tone: "faint" }));
+  return out.join("");
+}
+function mannequinNeck() {
+  const [x, y] = NECK;
+  const out = [];
+  out.push(S(k.cylinder(x, y, NECK_R + 4, MQ_TOP, 3, P, 40, 0.8), { tone: "lo" }));
+  out.push(S(k.cylinder(x, y, NECK_R, MQ_TOP + 3, NECK_TOP - MQ_TOP - 3, P, 40), { tone: "lo", crease: "none" }));
+  out.push(L(k.sideArc(x, y, NECK_R, NECK_TOP - 9, P, 24), { tone: "faint" }));
+  out.push(S(k.cylinder(x, y, NECK_R + 1.6, NECK_TOP, 3, P, 40, 0.6), { tone: "mid" }));
+  out.push(L(k.ring(x, y, NECK_R - 3, NECK_TOP + 3, P, 32), { tone: "faint" }));
+  out.push(S(k.cylinder(x, y, 3.2, NECK_TOP + 3, 4, P, 18), { tone: "mid" }));
+  out.push(L(k.knurl(x, y, 3.2, NECK_TOP + 3, NECK_TOP + 7, 14, P), { tone: "lo" }));
+  return out.join("");
+}
+
+// ---------- 背心 ----------
 const torsoRing = k.ringOf(TORSO, 10);
 function vestBody() {
   const out = [`<path class="iso-halo" d="${k.haloOf(k.insetPlan(TORSO, 6), HIP - 2, 0.1, P)}" style="filter:blur(5px)"/>`];
-  out.push(S(k.slabOf(TORSO, HIP, SHOULDER - HIP, P, 10, 1.4), {
+  // 羅紋下擺
+  out.push(S(k.slabOf(HEM, HIP, HEM_H, P, 10, 0.8), { tone: "mid" }));
+  const ribs = [];
+  for (let x = HEM.x + HEM.r + 2; x <= HEM.x + HEM.w - HEM.r - 2; x += 3.2) ribs.push(path3([[x, HEM.y + HEM.d, HIP + 0.6], [x, HEM.y + HEM.d, HIP + HEM_H - 0.6]]));
+  for (let y = HEM.y + HEM.r + 2; y <= HEM.y + HEM.d - HEM.r - 2; y += 3.2) ribs.push(path3([[HEM.x + HEM.w, y, HIP + 0.6], [HEM.x + HEM.w, y, HIP + HEM_H - 0.6]]));
+  out.push(L(ribs.join(""), { tone: "lo" }));
+  // 身體（車縫：腰線、背中線、兩條背部拼接線、側縫）
+  out.push(S(k.slabOf(TORSO, HIP + HEM_H, TOP - HIP - HEM_H, P, 10, 1.2), {
     tone: "mid",
     inner: [
-      L(k.ringSeam(torsoRing, HIP + 9, P), { tone: "lo" }),            // 下擺縫線
-      L(k.ringSeam(torsoRing, SHOULDER - 9, P), { tone: "faint" }),    // 肩線縫線
-      L(k.ringSeam(torsoRing, 135, P), { tone: "faint" }),             // 腰帶分割
+      L(k.ringSeam(torsoRing, 122, P), { tone: "lo" }),
+      L(k.ringSeam(torsoRing, TOP - 5, P), { tone: "faint" }),
     ].join(""),
   }));
-  // 右側袖口（+x 面）
-  out.push(L(k.sideRing([SIDE, 4, 168], 22, "x", P, 40), { tone: "lo" }));
-  out.push(L(k.sideRing([SIDE, 4, 168], 18, "x", P, 40), { tone: "faint" }));
-  // 右側縫線
-  out.push(L(path3([[SIDE, 4, HIP + 9], [SIDE, 4, 146]]), { tone: "faint" }));
-  // 背面中心縫線
-  out.push(L(path3([[0, BACK, HIP + 9], [0, BACK, SHOULDER - 9]]), { tone: "faint" }));
-  // 領口
-  out.push(S(k.cylinder(0, -6, NECK_R + 5, SHOULDER, 7, P, 48, 0.6), { tone: "mid" }));
-  out.push(S(k.cylinder(0, -6, NECK_R, SHOULDER + 7, 0.2, P, 48), { tone: "lo", flat: true }));
-  out.push(L(k.ring(0, -6, NECK_R + 2.5, SHOULDER + 7, P, 48), { tone: "faint" }));
+  out.push(L([0, -56, 56].map((x) => path3([[x, BACK, HIP + HEM_H], [x, BACK, TOP - 5]])).join(""), { tone: "faint" }));
+  out.push(L(path3([[SIDE, 0, HIP + HEM_H], [SIDE, 0, TOP - 5]]), { tone: "faint" }));
+  // 側邊調整帶與扣環（右側，控制盒上方）
+  const tab = { x: SIDE, y: -9, w: 1.6, d: 18, r: 0.6 };
+  out.push(S(k.slabOf(tab, 136, 10, P, 2, 0.2), { tone: "mid" }));
+  const buckle = { x: SIDE + 1.6, y: -11, w: 2.6, d: 22, r: 1.2 };
+  out.push(S(k.slabOf(buckle, 138, 6, P, 3, 0.4), { tone: "hi" }));
+  out.push(L(path3([[SIDE + 4.2, -7, 141], [SIDE + 4.2, 7, 141]]), { tone: "lo" }));
   return out.join("");
 }
-
-// ---------- 展示人台的脖子（從領口伸出） ----------
-function mannequinNeck() {
-  const out = [];
-  out.push(S(k.cylinder(0, -6, 13, SHOULDER + 7, 26, P, 40), { tone: "lo", crease: "none" }));
-  out.push(L(k.sideArc(0, -6, 13, SHOULDER + 20, P, 24), { tone: "faint" }));
-  out.push(S(k.cylinder(0, -6, 14.5, SHOULDER + 33, 3, P, 40, 0.6), { tone: "mid" }));
-  out.push(S(k.cylinder(0, -6, 3, SHOULDER + 36, 4, P, 18), { tone: "mid" }));
-  out.push(L(k.knurl(0, -6, 3, SHOULDER + 36, SHOULDER + 40, 14, P), { tone: "lo" }));
-  return out.join("");
-}
-
 // ---------- 風扇 ----------
 const fanFrame = (f) => G.frameOf([f.x, BACK, f.z], [0, 1, 0], [1, 0, 0], [0, 0, 1]);
 function bladesAt(f, phase) {
   const F = fanFrame(f);
-  // 每片扇葉是一片彎曲的葉面：前緣、外緣、後緣、內緣圍成一個封閉形狀
-  const r0 = 4.6, r1 = FAN_R - 3.6, width = 0.42, sweep = 0.5, s = FAN_T - 1.6, n = 8;
+  const r0 = 5, r1 = FAN_R - 3.6, width = 0.42, sweep = 0.5, s = FAN_T - 1.6, n = 8;
   let d = "";
   for (let b = 0; b < BLADES; b++) {
     const a = phase + (b / BLADES) * Math.PI * 2;
@@ -141,135 +193,163 @@ function bladesAt(f, phase) {
   }
   return d;
 }
+// 風扇側邊的出線座（+x 與 −x 方向）
+const glandAt = (f, dir) => ({ o: [f.x + dir * FAN_R, BACK + 3, f.z], a: [dir, 0, 0] });
+const glandEnd = (f, dir) => [f.x + dir * (FAN_R + GLAND_L), BACK + 3, f.z];
+function gland(g) {
+  const F = G.frameAlong(g.o, g.a);
+  return S(G.disc(0, GLAND_L, GLAND_R, F, P), { tone: "mid" }) + L(G.circleOf(F, GLAND_L, CABLE_R + 0.3, P), { tone: "lo" });
+}
 function fan(f) {
   const F = fanFrame(f);
   const out = [];
-  out.push(S(G.ringBand(0, FAN_T, FAN_R - 3, FAN_R, F, P), { tone: "mid" }));                 // 外框
-  out.push(S(G.disc(0, 1.2, FAN_R - 3, F, P), { tone: "lo", flat: true }));                    // 風道底
-  out.push(S(G.disc(0, FAN_T - 1, 4.4, F, P), { tone: "mid" }));                               // 馬達座
+  out.push(S(G.ringBand(0, 0.8, FAN_R, FAN_R + 2.6, F, P), { tone: "lo" }));                     // 車縫補強布
+  out.push(D(G.dotsOf(F, 0.8, FAN_R + 1.3, 28, P, { all: true }), { size: 0.32, tone: "mid" }));   // 車縫線
+  out.push(S(G.ringBand(0.8, FAN_T, FAN_R - 3, FAN_R, F, P), { tone: "mid" }));                    // 外框
+  out.push(fadedRibs(F));
+  out.push(S(G.disc(0.8, 1.6, FAN_R - 3, F, P), { tone: "lo", flat: true }));                      // 風道底
+  out.push(S(G.disc(1.6, FAN_T - 1, 4.6, F, P), { tone: "mid" }));                                 // 馬達座
   out.push(`<path data-part="${f.id}-blades" class="vest-blade" d="${bladesAt(f, 0)}"/>`);
-  out.push(L([7, 11, 15].map((r) => G.circleOf(F, FAN_T + 0.2, r, P)).join(""), { tone: "lo" })); // 防護網
-  out.push(L(G.spokesOf(F, FAN_T + 0.2, 4.4, FAN_R - 3, 4, P, { phase: Math.PI / 4 }), { tone: "lo" }));
+  out.push(L([7.5, 11.5, 15.4].map((r) => G.circleOf(F, FAN_T + 0.2, r, P)).join(""), { tone: "lo" })); // 防護網
+  out.push(L(G.spokesOf(F, FAN_T + 0.2, 4.6, FAN_R - 3, 6, P, { phase: Math.PI / 6 }), { tone: "lo" }));
+  out.push(S(G.disc(FAN_T - 0.2, FAN_T + 0.6, 4.2, F, P), { tone: "hi" }));                       // 中心貼紙
+  out.push(L(G.circleOf(F, FAN_T + 0.6, 2.6, P), { tone: "faint" }));
   out.push(D(G.dotsOf(F, FAN_T, FAN_R - 1.5, 4, P, { all: true, phase: Math.PI / 4 }), { size: 0.5 }));
-  out.push(D([at(G.pointOf(F, FAN_T + 0.2, 0, 0))], { size: 0.6, tone: "hi" }));
   return titled({ id: f.id, zh: tr(`風扇 ${f.id.slice(1)}（${f.zone === "upper" ? "上方" : "下方"}，12V）`, `Fan ${f.id.slice(1)} (${f.zone}, 12V)`) }, out.join(""));
 }
+function fadedRibs(F) {
+  const ribs = G.ribsOf(F, 1.6, FAN_T - 0.6, FAN_R, 44, P, { fade: [0.05, 0.45], seams: true });
+  return Array.isArray(ribs) ? k.fadedSvg(ribs, { tone: "lo" }) : L(ribs.d || "", { tone: "lo" });
+}
 
-// ---------- 溫濕度感測器（背面上緣） ----------
+// ---------- 溫濕度感測器（背面上方中央，透氣網罩） ----------
 function dht() {
-  const plan = { x: -8, y: BACK, w: 16, d: 3, r: 0.8 };
-  const out = [S(k.slabOf(plan, 184, 14, P, 3, 0.4), { tone: "hi" })];
-  for (let i = 0; i < 4; i++) out.push(L(path3([[-5 + i * 3.4, BACK + 3, 187], [-5 + i * 3.4, BACK + 3, 195]]), { tone: "lo" }));
+  const plan = { x: -8, y: BACK, w: 16, d: 3.4, r: 1 };
+  const out = [S(k.slabOf(plan, 151, 14, P, 3, 0.4), { tone: "hi" })];
+  const slots = [];
+  for (let i = 0; i < 4; i++) slots.push(path3([[-5 + i * 3.4, BACK + 3.4, 154], [-5 + i * 3.4, BACK + 3.4, 162]]));
+  out.push(L(slots.join(""), { tone: "lo" }));
+  out.push(D([at([-6, BACK + 3.4, 152.6]), at([6, BACK + 3.4, 152.6])], { size: 0.4 }));
   return titled({ id: "dht", zh: tr("DHT11 溫濕度感測器", "DHT11 temperature and humidity sensor") }, out.join(""));
 }
 
-// ---------- 右腰：電池盒與控制盒 ----------
-const BATT = { x: SIDE, y: 8, w: 16, d: 26, r: 4 };
-const BATT_Z = 72, BATT_H = 46;
-const BOX = { x: SIDE, y: -30, w: 13, d: 30, r: 2 };
-const BOX_Z = 76, BOX_H = 36;
-function battery() {
-  const out = [S(k.slabOf(BATT, BATT_Z, BATT_H, P, 6, 1), { tone: "hi" })];
-  const fx = BATT.x + BATT.w;
-  for (let i = 0; i < 4; i++) out.push(D([at([fx, BATT.y + 7 + i * 4, BATT_Z + 36])], { size: 0.9, tone: i < 3 ? "hi" : "lo" }));
-  out.push(S(k.cylinder(BATT.x + BATT.w / 2, BATT.y + 18, 3, BATT_Z + BATT_H, 3, P, 20), { tone: "mid" }));   // DC 輸出
-  out.push(L(k.ring(BATT.x + BATT.w / 2, BATT.y + 18, 1.2, BATT_Z + BATT_H + 3, P, 12), { tone: "lo" }));
-  out.push(S(k.slabOf({ x: BATT.x + 4, y: BATT.y + 5, w: 8, d: 4, r: 1 }, BATT_Z + BATT_H, 1.2, P, 2), { tone: "lo" })); // USB 孔
-  out.push(L(path3([[fx, BATT.y + 3, BATT_Z + 8], [fx, BATT.y + BATT.d - 3, BATT_Z + 8]]), { tone: "faint" }));
-  return titled({ id: "battery", zh: tr("12V 電池盒（DC 輸出接風扇、USB 供電給 ESP32）", "12V battery pack (DC to the fans, USB to the ESP32)") }, out.join(""));
-}
+// ---------- 右側控制盒 ----------
+const boxTop = BOX_Z + BOX_H;
+const BOX_GLANDS = [[BOX.x + 6.5, -8], [BOX.x + 6.5, 1], [BOX.x + 6.5, 9]];
 function controlBox() {
-  const out = [S(k.slabOf(BOX, BOX_Z, BOX_H, P, 4, 0.8), { tone: "mid" })];
-  const lid = { x: BOX.x + 1, y: BOX.y + 1, w: BOX.w - 2, d: BOX.d - 2, r: 1.5 };
-  out.push(L(k.planOutline(lid, BOX_Z + BOX_H, P), { tone: "faint" }));
-  out.push(D(k.corners(BOX, 2.6).map(([x, y]) => at([x, y, BOX_Z + BOX_H])), { size: 0.45 }));
+  const out = [S(k.slabOf(BOX, BOX_Z, BOX_H, P, 4, 0.8), { tone: "hi" })];
+  out.push(L(k.planOutline(k.insetPlan(BOX, 1.2), boxTop, P, 4), { tone: "faint" }));
+  out.push(D(k.corners(BOX, 2.4).map(([x, y]) => at([x, y, boxTop])), { size: 0.45 }));
   const fx = BOX.x + BOX.w;
-  // 側面散熱槽
-  for (let i = 0; i < 5; i++) out.push(L(path3([[fx, BOX.y + 6 + i * 4.4, BOX_Z + 8], [fx, BOX.y + 6 + i * 4.4, BOX_Z + 20]]), { tone: "lo" }));
-  out.push(L(path3([[fx, BOX.y + 4, BOX_Z + 28], [fx, BOX.y + BOX.d - 4, BOX_Z + 28]]), { tone: "faint" }));
-  // 線材出口
-  out.push(S(k.cylinder(BOX.x + 6.5, BOX.y + 8, 2.4, BOX_Z + BOX_H, 3, P, 18), { tone: "lo" }));
-  out.push(S(k.cylinder(BOX.x + 6.5, BOX.y + 22, 2.4, BOX_Z + BOX_H, 3, P, 18), { tone: "lo" }));
+  const vents = [];
+  for (let i = 0; i < 6; i++) vents.push(path3([[fx, BOX.y + 5 + i * 3.6, BOX_Z + 6], [fx, BOX.y + 5 + i * 3.6, BOX_Z + 17]]));
+  out.push(L(vents.join(""), { tone: "lo" }));
+  out.push(L(k.sideSeam(BOX, BOX_Z + 24, P, 4), { tone: "faint" }));
+  // 電源指示燈窗
+  out.push(S(k.slabOf({ x: fx, y: BOX.y + 19, w: 0.6, d: 5, r: 0.8 }, BOX_Z + 28, 3, P, 2), { tone: "lo", flat: true }));
+  out.push(D([at([fx + 0.6, BOX.y + 21.5, BOX_Z + 29.5])], { size: 0.7, tone: "hi" }));
+  // 底部出線座（接電池）
+  out.push(S(k.cylinder(BOX.x + 6.5, -8, 2.2, BOX_Z - 2.4, 2.4, P, 18), { tone: "mid" }));
+  for (const [x, y] of BOX_GLANDS) out.push(S(k.cylinder(x, y, 2.2, boxTop, 2.4, P, 18), { tone: "mid" }));
   return titled({ id: "box", zh: tr("控制盒：ESP32、D4184 ×2、INA219、保險絲、1N5819", "Control box: ESP32, 2 × D4184, INA219, fuse, 1N5819") }, out.join(""));
 }
 
-// ---------- 肩上：觸控、狀態燈、蜂鳴器；領口：心率 ----------
-function shoulder() {
-  const out = [];
-  const pad = { x: 30, y: -16, w: 18, d: 14, r: 1.2 };
-  out.push(titled({ id: "touch", zh: tr("觸控按鈕（TTP223）：碰一下換風速、按住切換自動／手動", "Touch button (TTP223): tap to change speed, hold to switch auto and manual") },
-    S(k.slabOf(pad, SHOULDER, 1.8, P, 3, 0.4), { tone: "hi" }) +
-    L([2, 3.6, 5.2].map((r) => k.ring(pad.x + 7, pad.y + 7, r, SHOULDER + 1.8, P, 28)).join(""), { tone: "lo" }) +
-    D([at([pad.x + 7, pad.y + 7, SHOULDER + 1.8])], { size: 0.5, tone: "mid" })));
-  out.push(titled({ id: "led", zh: tr("WS2812B 狀態燈：顏色代表溫度等級", "WS2812B status light: its colour shows the temperature level") },
-    S(k.cylinder(43, 6, 4.4, SHOULDER, 2, P, 24), { tone: "mid" }) +
-    `<path data-part="led-dome" class="vest-led" d="${k.cylinder(43, 6, 2.8, SHOULDER + 2, 1.6, P, 24).fill}"/>`));
-  out.push(titled({ id: "buzzer", zh: tr("蜂鳴器：中暑、心率、喝水提醒", "Buzzer: heat, heart-rate and drink reminders") },
-    S(k.cylinder(-40, 4, 6, SHOULDER, 5, P, 32, 0.5), { tone: "mid" }) +
-    L(k.ring(-40, 4, 1.6, SHOULDER + 5, P, 16) + k.ring(-40, 4, 4, SHOULDER + 5, P, 24), { tone: "lo" })));
-  out.push(titled({ id: "pulse", zh: tr("心率感測器（類比 PulseSensor）：貼在領口內側", "Pulse sensor (analog PulseSensor) inside the collar") },
-    S(k.cylinder(0, 11, 3.4, SHOULDER + 7.2, 1.4, P, 24), { tone: "hi" }) +
-    D([at([0, 11, SHOULDER + 8.6])], { size: 0.7, tone: "hi" })));
-  return out.join("");
+// ---------- 電池（放在底座上，DC 線接到控制盒） ----------
+function battery() {
+  const out = [`<path class="iso-halo" d="${k.haloOf(k.insetPlan(BATT, 2), 0, 0.1, P)}" style="filter:blur(3px)"/>`];
+  out.push(S(k.slabOf(BATT, 0, BATT_H, P, 8, 1.2), { tone: "hi", inner: L(k.sideSeam(BATT, 5, P, 8), { tone: "faint" }) }));
+  out.push(L(k.planOutline(k.insetPlan(BATT, 3), BATT_H, P, 6), { tone: "faint" }));
+  // 電量燈與四段調速鈕
+  out.push(D([0, 1, 2, 3].map((i) => at([BATT.x + 9 + i * 4.4, BATT.y + 8, BATT_H])), { size: 0.85, tone: "hi" }));
+  out.push(S(k.cylinder(BATT.x + 11, BATT.y + 30, 4.6, BATT_H, 1.6, P, 28, 0.4), { tone: "mid" }));
+  out.push(L(k.ring(BATT.x + 11, BATT.y + 30, 2.4, BATT_H + 1.6, P, 20), { tone: "lo" }));
+  // DC 輸出與 USB
+  out.push(S(k.cylinder(BATT.x + 25, BATT.y + 34, 3.4, BATT_H, 3, P, 24), { tone: "mid" }));
+  out.push(L(k.ring(BATT.x + 25, BATT.y + 34, 1.3, BATT_H + 3, P, 14), { tone: "lo" }));
+  out.push(S(k.slabOf({ x: BATT.x + 19, y: BATT.y + 18, w: 10, d: 4, r: 1 }, BATT_H, 0.8, P, 2), { tone: "lo", flat: true }));
+  return titled({ id: "battery", zh: tr("12V 電池（DC 輸出接控制盒、USB 供電給 ESP32）", "12V battery (DC to the control box, USB to the ESP32)") }, out.join(""));
 }
 
 // ---------- 線材 ----------
-function cables() {
-  const top = BOX_Z + BOX_H + 3;
+const fanCables = () => {
   const out = [];
-  // 電池 DC → 控制盒
-  out.push(k.wireSvg(at([BATT.x + BATT.w / 2, BATT.y + 18, BATT_Z + BATT_H + 3]), at([BOX.x + 6.5, BOX.y + 22, top]), { via: [at([BATT.x + BATT.w / 2, BATT.y + 18, top + 10]), at([BOX.x + 6.5, BOX.y + 22, top + 10])], tone: "mid" }));
-  // 控制盒 → 上方、下方風扇（沿右側面往後背）
-  const exit = [BOX.x + 6.5, BOX.y + 8, top];
-  for (const [f, z] of [[FANS[1], 150], [FANS[3], 124]]) {
-    out.push(k.wireSvg(at(exit), at([f.x + FAN_R, BACK + FAN_T / 2, f.z]), {
-      via: [at([exit[0], exit[1], z]), at([SIDE + 1, 30, z]), at([SIDE - 8, BACK + 1, z]), at([f.x + FAN_R + 6, BACK + 1, f.z])],
-      tone: "lo", flow: true,
-    }));
-  }
-  // 上下兩組各自的一分二
-  for (const [a, b] of [[FANS[1], FANS[0]], [FANS[3], FANS[2]]]) {
-    out.push(k.wireSvg(at([a.x - FAN_R, BACK + FAN_T / 2, a.z]), at([b.x + FAN_R, BACK + FAN_T / 2, b.z]), { tone: "lo" }));
-  }
-  // 肩上元件 → 控制盒（沿右側面）
-  out.push(k.wireSvg(at([pad0.x + 18, pad0.y + 7, SHOULDER + 1]), at([BOX.x + 2, BOX.y + 15, BOX_Z + BOX_H]), {
-    via: [at([SIDE + 0.5, -16 + 7, SHOULDER - 2]), at([SIDE + 0.5, -16, BOX_Z + BOX_H + 8])], tone: "faint", dotted: true,
-  }));
+  const exitTop = (i) => [BOX_GLANDS[i][0], BOX_GLANDS[i][1], boxTop + 2.4];
+  // 控制盒 → 上方右風扇（繞過右後轉角）
+  const corner = (z) => [[SIDE + 3, 14, z], [SIDE - 3 + 2.6, 28.4, z], [SIDE - 18, BACK + 3, z]];
+  out.push(cable([exitTop(2), [exitTop(2)[0], 9, boxTop + 7], [SIDE + 3, 12, boxTop + 9], [SIDE + 3, 14, FANS[1].z], ...corner(FANS[1].z).slice(1), glandEnd(FANS[1], 1)]));
+  // 控制盒 → 下方右風扇（沿右側面往下，從控制盒後方繞到背面）
+  out.push(cable([exitTop(1), [exitTop(1)[0], 1, boxTop + 5], [SIDE + 3.4, 19, boxTop + 3], [SIDE + 3.4, 20, FANS[3].z + 6], [SIDE + 2, 21, FANS[3].z], ...corner(FANS[3].z).slice(1), glandEnd(FANS[3], 1)]));
+  // 每排的一分二
+  for (const [a, b] of [[FANS[0], FANS[1]], [FANS[2], FANS[3]]]) out.push(cable([glandEnd(a, 1), glandEnd(b, -1)]));
+  // 電池 → 控制盒底部
+  out.push(cable([[BATT.x + 25, BATT.y + 34, BATT_H + 3], [BATT.x + 25, BATT.y + 34, BATT_H + 14], [BOX.x + 6.5, -30, 40], [BOX.x + 6.5, -8, 66], [BOX.x + 6.5, -8, BOX_Z - 2.4]], { r: 1.35, bend: 8 }));
+  return out.join("");
+};
+const shoulderHarness = () => cable(
+  [[44, -11, STRAP_TOP + 0.9], [YOKE.x + YOKE.w - 2, -11, STRAP_TOP + 0.9], [YOKE.x + YOKE.w + 1, -11, TOP + 1], [SIDE + 1, -11, TOP + 1], [SIDE + 1, -11, 150], [SIDE + 1, -8, boxTop + 9], [BOX_GLANDS[0][0], -8, boxTop + 2.4]],
+  { r: 0.8, bend: 3, tone: "mid" },
+);
+
+// ---------- 肩上：觸控、狀態燈、蜂鳴器；後領：心率 ----------
+function shoulderParts() {
+  const out = [];
+  const pad = { x: 27, y: -19, w: 18, d: 14, r: 1.2 };
+  out.push(titled({ id: "touch", zh: tr("觸控按鈕（TTP223）：碰一下換風速、按住切換自動／手動", "Touch button (TTP223): tap to change speed, hold to switch auto and manual") },
+    S(k.slabOf(pad, STRAP_TOP, 1.8, P, 3, 0.4), { tone: "hi" }) +
+    L([2, 3.6, 5.2].map((r) => k.ring(pad.x + 7, pad.y + 7, r, STRAP_TOP + 1.8, P, 28)).join(""), { tone: "lo" }) +
+    D([at([pad.x + 7, pad.y + 7, STRAP_TOP + 1.8]), at([pad.x + 15.4, pad.y + 7, STRAP_TOP + 1.8])], { size: 0.45, tone: "mid" })));
+  out.push(titled({ id: "led", zh: tr("WS2812B 狀態燈：顏色代表溫度等級", "WS2812B status light: its colour shows the temperature level") },
+    S(k.cylinder(40, 9, 4.6, STRAP_TOP, 2, P, 24, 0.4), { tone: "mid" }) +
+    `<path data-part="led-dome" class="vest-led" d="${k.cylinder(40, 9, 3, STRAP_TOP + 2, 1.6, P, 24).fill}"/>`));
+  out.push(titled({ id: "buzzer", zh: tr("蜂鳴器：中暑、心率、喝水提醒", "Buzzer: heat, heart-rate and drink reminders") },
+    S(k.cylinder(-40, 0, 6.4, STRAP_TOP, 5, P, 32, 0.5), { tone: "hi" }) +
+    L(k.ring(-40, 0, 1.6, STRAP_TOP + 5, P, 16) + k.ring(-40, 0, 4.2, STRAP_TOP + 5, P, 24), { tone: "lo" })));
+  out.push(titled({ id: "pulse", zh: tr("心率感測器（類比 PulseSensor）：縫在後領內側貼脖子", "Pulse sensor (analog PulseSensor) inside the back collar, against the neck") },
+    S(k.cylinder(0, NECK[1] + 19.5, 3.2, COLLAR_TOP, 1.4, P, 28, 0.3), { tone: "hi" }) +
+    `<path class="vest-pulse" d="${k.cylinder(0, NECK[1] + 19.5, 1.2, COLLAR_TOP + 1.4, 0.4, P, 16).fill}"/>`));
   return out.join("");
 }
-const pad0 = { x: 30, y: -16 };
 
 // ---------- 手機（藍牙控制頁） ----------
-const PHONE = { x: -88, y: 20, w: 34, d: 60, r: 5 };
 function phone() {
   const out = [`<path class="iso-halo" d="${k.haloOf(k.insetPlan(PHONE, 2), 0, 0.1, P)}" style="filter:blur(3px)"/>`];
-  out.push(S(k.slabOf(PHONE, 0, 3.4, P, 6, 0.6), { tone: "mid" }));
-  const screen = k.insetPlan(PHONE, 2.4);
-  out.push(S(k.slabOf(screen, 3.4, 0.1, P, 4), { tone: "lo", flat: true, crease: "none" }));
-  // 儀表弧與數字
+  out.push(S(k.slabOf(PHONE, 0, 3.6, P, 6, 0.6), { tone: "mid" }));
+  const screen = k.insetPlan(PHONE, 2.2);
+  out.push(S(k.slabOf(screen, 3.6, 0.1, P, 4), { tone: "lo", flat: true, crease: "none" }));
+  out.push(S(k.slabOf({ x: PHONE.x + 12, y: PHONE.y + 3, w: 10, d: 2.4, r: 1.2 }, 3.7, 0.1, P, 2), { tone: "mid", flat: true, crease: "none" }));
   const c = [PHONE.x + PHONE.w / 2, PHONE.y + 22];
-  out.push(L(k.ring(c[0], c[1], 9, 3.6, P, 40), { tone: "faint" }));
+  out.push(L(k.ring(c[0], c[1], 9, 3.8, P, 40), { tone: "faint" }));
   out.push(`<path data-part="phone-arc" class="iso-line" data-tone="lit" d="" style="stroke-width:1.4"/>`);
-  out.push(k.faceTextSvg(k.topMatrix([c[0], c[1] + 2], 3.6, P, "x"), "—", { size: 4.2, tone: "hi", anchor: "middle" }).replace("<text", '<text data-part="phone-temp"'));
-  for (let i = 0; i < 3; i++) out.push(L(k.lineOnTop([PHONE.x + 7, PHONE.y + 40 + i * 5], [PHONE.x + PHONE.w - 7, PHONE.y + 40 + i * 5], 3.6, P), { tone: "faint", free: "both" }));
-  out.push(D([at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d - 4, 3.4])], { size: 0.6, tone: "lo" }));
+  out.push(k.faceTextSvg(k.topMatrix([c[0], c[1] + 2], 3.8, P, "x"), "—", { size: 4.2, tone: "hi", anchor: "middle" }).replace("<text", '<text data-part="phone-temp"'));
+  // 三張小卡：上方、下方、心率
+  for (let i = 0; i < 3; i++) {
+    const card = { x: PHONE.x + 4 + i * 9, y: PHONE.y + 36, w: 8, d: 9, r: 1.2 };
+    out.push(L(k.planOutline(card, 3.8, P, 3), { tone: "faint" }));
+    out.push(L(k.lineOnTop([card.x + 2, card.y + 6], [card.x + 6, card.y + 6], 3.8, P), { tone: i === 2 ? "lit" : "lo", free: "both" }));
+  }
+  for (let i = 0; i < 2; i++) out.push(L(k.lineOnTop([PHONE.x + 6, PHONE.y + 50 + i * 4.6], [PHONE.x + PHONE.w - 6, PHONE.y + 50 + i * 4.6], 3.8, P), { tone: "faint", free: "both" }));
   return titled({ id: "phone", zh: tr("手機控制頁（藍牙 BLE）", "Phone control page (Bluetooth LE)") }, out.join(""));
 }
 
 // ---------- 組合（由後往前畫） ----------
-const fansSorted = [...FANS].sort((a, b) => k.depthOf([a.x, BACK, a.z], P) - k.depthOf([b.x, BACK, b.z], P));
+const fansSorted = byDepth(FANS, (f) => [f.x, BACK, f.z]);
+const glands = [glandAt(FANS[0], 1), glandAt(FANS[1], -1), glandAt(FANS[1], 1), glandAt(FANS[2], 1), glandAt(FANS[3], -1), glandAt(FANS[3], 1)];
 const svg = k.figureSvg({
   width: WIDTH,
   height: HEIGHT,
-  label: tr("智能溫控風扇背心的成品立體圖：背心穿在展示架上，背後上下各兩顆 12V 風扇，右腰是電池盒與控制盒，肩上有觸控按鈕、狀態燈與蜂鳴器，領口內側有心率感測器，底座上放著顯示即時溫度的手機。", "The finished smart cooling vest on a display stand: two 12V fans high and two low on the back, a battery pack and control box at the right hip, a touch button, status light and buzzer on the shoulder, a pulse sensor inside the collar, and a phone on the base showing the live temperature."),
-  body: [base(), phone(), stand(), vestBody(), dht(), ...fansSorted.map(fan), battery(), controlBox(), cables(), mannequinNeck(), shoulder()],
+  label: tr("智能溫控風扇背心的成品立體圖：背心穿在展示人台上，背後上下各兩顆 12V 風扇，右腰是控制盒，肩帶上有觸控按鈕、狀態燈與蜂鳴器，後領內側有心率感測器；12V 電池與顯示即時溫度的手機放在底座上。", "The finished smart cooling vest on a display mannequin: two 12V fans high and two low on the back, a control box at the right hip, a touch button, status light and buzzer on the shoulder straps and a pulse sensor inside the back collar; the 12V battery and a phone showing the live temperature sit on the base."),
+  body: [
+    base(), phone(), battery(), stand(),
+    vestBody(), dht(), ...fansSorted.map(fan), fanCables(), glands.map(gland).join(""), controlBox(),
+    yoke(), collarRing(), mannequinNeck(), shoulderHarness(), shoulderParts(),
+  ],
 });
 
-// 預先算好每顆風扇的扇葉轉動畫格
+
 const bladeFrames = Object.fromEntries(FANS.map((f) => [f.id, Array.from({ length: PHASES }, (_, i) => bladesAt(f, (i / PHASES) * (Math.PI * 2 / BLADES)))]));
 const phoneC = [PHONE.x + PHONE.w / 2, PHONE.y + 22];
 
-const words = EN ? { inside: "Inside ", upper: "upper ", lower: "lower ", hr: "heart ", alert: " (alert)" } : { inside: "背心內 ", upper: "上方 ", lower: "下方 ", hr: "心率 ", alert: "（警報）" };
+const words = EN ? { inside: "", upper: "up ", lower: "low ", hr: "", alert: " !" } : { inside: "背心內 ", upper: "上方 ", lower: "下方 ", hr: "心率 ", alert: "（警報）" };
 const live = `
 const W = ${JSON.stringify(words)};
 const P = ${JSON.stringify(P)};
@@ -343,12 +423,12 @@ stage.addEventListener("keydown", (e) => {
 draw(fansFor(temp));
 `;
 
-const css = `<style>.vest-blade{fill:var(--anatomy-hi);fill-opacity:.35;stroke:var(--anatomy-lit);stroke-width:.7;stroke-linejoin:round}.vest-led{fill:#0078ff;stroke:var(--anatomy-hi);stroke-width:.6;filter:drop-shadow(0 0 3px currentColor)}</style>`;
+const css = `<style>.vest-blade{fill:var(--anatomy-hi);fill-opacity:.35;stroke:var(--anatomy-lit);stroke-width:.7;stroke-linejoin:round}.vest-pulse{fill:#4ade80;filter:drop-shadow(0 0 2px #4ade80)}.vest-led{fill:#0078ff;stroke:var(--anatomy-hi);stroke-width:.6;filter:drop-shadow(0 0 3px currentColor)}</style>`;
 const body = css + k.plateHtml({
   fig: "Fig 1",
   title: tr("智能溫控風扇背心", "Smart cooling vest"),
-  hint: tr("左右移動滑鼠改變溫度；方向鍵每次 1°C", "Move left and right to change the temperature; arrow keys step 1°C"),
-  readout: tr("背心內 25.0°C · 上方 0% · 下方 0%", "Inside 25.0°C · upper 0% · lower 0%"),
+  hint: tr("左右移動滑鼠改變溫度；方向鍵每次 1°C", "Move to set the temperature"),
+  readout: tr("背心內 25.0°C · 上方 0% · 下方 0%", "25.0°C · up 0% · low 0%"),
   keys: [
     { mark: "lit", label: tr("扇葉：依體感溫度自動調速（28°C 啟動、35°C 全速，下方多 10%）", "Fan blades: speed follows the feels-like temperature (start at 28°C, full at 35°C, lower fans +10%)") },
     { mark: "raised", label: tr("背後四顆 12V 風扇、右腰電池盒與控制盒、肩上觸控按鈕／狀態燈／蜂鳴器、領口心率感測器", "Four 12V fans on the back, battery and control box at the hip, touch button, light and buzzer on the shoulder, pulse sensor at the collar") },
