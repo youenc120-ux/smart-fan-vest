@@ -35,7 +35,11 @@ a { color: inherit; }
 .bar nav { margin-left: auto; display: flex; gap: 22px; font-size: 15px; }
 .bar nav a { color: var(--text-2); text-decoration: none; }
 .bar nav a:hover { color: var(--text); }
-@media (max-width: 720px) { .bar nav { display: none; } }
+.lang { min-height: 36px; min-width: 48px; padding: 0 12px; background: transparent; color: var(--text-2); border: 1px solid var(--line); border-radius: 999px; font: 600 13px var(--num); cursor: pointer; }
+.lang:hover { color: var(--text); border-color: #343b48; }
+@media (max-width: 720px) { .bar nav { display: none; } .lang { margin-left: auto; } }
+html[lang="en"] body { line-height: 1.6; }
+html[lang="en"] h1 { letter-spacing: -.02em; }
 
 /* 主視覺 */
 .hero { padding-top: 72px; padding-bottom: 28px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; }
@@ -143,6 +147,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: 
       <a href="#spec">規格</a>
       <a href="../">控制頁</a>
     </nav>
+    <button class="lang" id="langBtn" type="button" aria-label="Switch to English">EN</button>
   </div>
 </header>
 
@@ -320,6 +325,126 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: 
 </footer>
 
 <script>
+// 中英切換：以中文原文為鍵，找到相同的文字節點或屬性就換成英文；語言設定與控制頁共用（fv-lang）
+const EN = {
+  "智能溫控風扇背心": "Smart Cooling Vest",
+  "運作方式": "How it works", "功能": "Features", "規格": "Specs", "控制頁": "Control page",
+  "頁面導覽": "Page navigation",
+  "熱的時候，": "When it gets hot,", "背心自己知道。": "your vest already knows.",
+  "把市售空調服改裝成會看體感溫度與心率、自動調整風速的風扇背心。悶熱時吹更強、心跳太快時主動降溫，中暑前就先提醒你。":
+    "A store-bought fan jacket, rebuilt to read how hot it feels and how fast your heart is beating, and set its own fan speed. It blows harder when it's muggy, cools you down when your heart races, and warns you before heat illness sets in.",
+  "試玩控制頁": "Try the control page", "原始碼": "Source code",
+  "顆 12V 風扇，上下分區": "12V fans in upper and lower zones",
+  "體感溫度自動升速": "feels-like range for auto speed-up",
+  "bpm 心率警報門檻": "bpm heart-rate alert",
+  "風扇背心互動立體圖：左右移動滑鼠改變溫度，風扇、狀態燈與手機畫面會跟著變化": "Interactive figure of the fan vest: move the pointer left and right to change the temperature; the fans, status light and phone screen follow.",
+  "互動立體圖：左右移動滑鼠（或用方向鍵）改變溫度，看風扇怎麼反應。": "Interactive figure: move the pointer left and right (or use the arrow keys) to change the temperature and watch the fans respond.",
+  "為什麼要做": "Why", "市售空調服只會一直吹": "Fan jackets just keep blowing",
+  "戶外工作、運動、通勤時穿的風扇衣，只有手動的四段調速，沒辦法跟著環境與身體狀態變化。":
+    "Fan jackets worn for outdoor work, sport or commuting only have four manual speeds. They can't keep up with the weather or with how your body is doing.",
+  "熱了要自己調": "You adjust it by hand",
+  "天氣忽冷忽熱，要一直伸手調檔位；忘了調，不是太熱就是浪費電。": "As the weather changes you keep reaching for the switch. Forget, and you're either too hot or wasting battery.",
+  "只看溫度不夠": "Temperature isn't enough",
+  "同樣 32°C，濕度高時體感更熱。悶熱、身體已經吃力時，風速卻沒有跟上。": "32°C feels much hotter when it's humid. When it's muggy and your body is struggling, the fans don't keep up.",
+  "中暑來得很突然": "Heat illness comes on fast",
+  "在高溫下專心工作，常常等到頭暈才發現。需要有人在旁邊提醒你休息、喝水。": "Focused on work in the heat, you often notice only when you feel dizzy. You need something to remind you to rest and drink.",
+  "感測、判斷、散熱，每秒一次": "Sense, decide, cool — every second",
+  "控制盒裡的 ESP32 讀取感測器，用跟體感溫度、心率相關的規則決定上下兩組風扇的轉速。":
+    "The ESP32 in the control box reads its sensors and sets the upper and lower fan speeds from rules based on feels-like temperature and heart rate.",
+  "感測": "Sense",
+  "DHT11 量背心內溫濕度並算出體感溫度；心率感測器貼在領口；INA219 量電流與電池電壓。": "A DHT11 measures temperature and humidity inside the vest to work out the feels-like temperature, a pulse sensor sits at the collar, and an INA219 measures current and battery voltage.",
+  "判斷": "Decide",
+  "依體感溫度算出風速，有遲滯不會來回開關；心率偏快就加速，加上中暑、熱壓力與低電量判斷。": "Fan speed follows the feels-like temperature, with hysteresis so it doesn't flick on and off. A fast heart rate adds speed, and it checks for heat illness, heat strain and low battery.",
+  "散熱與提醒": "Cool and remind",
+  "兩個 D4184 分別調上方、下方風扇；蜂鳴器、狀態燈與手機同步警示，提醒喝水和休息。": "Two D4184 drivers set the upper and lower fans. The buzzer, status light and phone alert together and remind you to drink and rest.",
+  "體感溫度與風速曲線：26°C 以下停止，28°C 啟動為 30%，35°C 達到 100%，下方比上方多 10%": "Feels-like temperature against fan speed: off below 26°C, starts at 30% at 28°C, 100% at 35°C, lower fans 10% above the upper ones",
+  "遲滯區": "Hysteresis",
+  "自動模式": "Auto mode", "越悶越熱，吹得越強": "The muggier it gets, the harder it blows",
+  "上方風扇": "Upper fans", "：體感溫度 28°C 啟動（30%），35°C 全速。": ": start at 30% when it feels like 28°C, full speed at 35°C.",
+  "下方風扇": "Lower fans", "：比上方多 10%，腰背流汗多的地方吹更強。": ": 10% more than the upper fans, for the lower back where you sweat most.",
+  "遲滯": "Hysteresis", "：降到 26°C 以下才停，不會在門檻附近一直開開關關。": ": they only stop below 26°C, so they don't keep switching near the threshold.",
+  "心率連動": "Heart-rate boost", "：心率接近門檻再加 20%，心率警報時直接全速。": ": 20% more as your heart rate nears the alert threshold, full speed during a heart-rate alert.",
+  "不只是會轉的風扇": "More than fans that spin",
+  "從安全、舒適到使用方便，十幾項功能都在 ESP32 上離線運作，手機只是用來看和調整。": "From safety to comfort to convenience, more than a dozen features run offline on the ESP32. The phone is only for watching and adjusting.",
+  "安全": "Safety", "舒適": "Comfort", "智慧": "Smart",
+  "中暑與熱壓力警示": "Heat illness and heat strain alerts",
+  "體感溫度過高，或溫度偏高加上心跳偏快持續 30 秒，蜂鳴器響、燈閃紅、手機震動。": "When it feels too hot, or it's warm and your heart has been racing for 30 seconds, the buzzer sounds, the light flashes red and the phone vibrates.",
+  "心率過高警報": "High heart-rate alarm",
+  "心率持續 10 秒超過門檻就警報。這是安全警報，蜂鳴器關閉時也會響。": "It alarms when your heart rate stays above the threshold for 10 seconds. It's a safety alarm, so it sounds even with the buzzer turned off.",
+  "電源保護": "Power protection",
+  "超過 3A 自動停止風扇；低電量時限制風速、延長使用時間；感測器故障時保持 70% 轉速。": "Fans stop above 3A, speed is capped on low battery to make it last, and the fans hold 70% if a sensor fails.",
+  "上下分區調速": "Upper and lower zones",
+  "四顆風扇分成上方、下方兩組，各自 PWM 調速；啟動時先全速一下，低速也轉得起來。": "The four fans form upper and lower pairs, each with its own PWM speed. A brief full-speed kick gets them turning even at low speed.",
+  "喝水與休息提醒": "Drink and rest reminders",
+  "累計高溫時間，每 20 分鐘提醒喝水，連續 60 分鐘建議休息。": "It tracks time spent in the heat, reminds you to drink every 20 minutes and suggests a rest after 60.",
+  "情境模式": "Profiles",
+  "戶外工作、運動、安靜、省電一鍵切換；也會學習你的手動調整，自動微調門檻。": "Switch between outdoor work, sport, quiet and eco in one tap. It also learns from your manual changes and fine-tunes its thresholds.",
+  "手機藍牙控制": "Phone control over Bluetooth",
+  "免安裝 App，用瀏覽器就能看溫度、心率、電量與剩餘時間，還能匯出紀錄。": "No app to install: the browser shows temperature, heart rate, battery and time left, and exports a log.",
+  "觸控按鈕": "Touch button",
+  "沒帶手機也能操作：碰一下換風速、連碰兩下換情境、按住切換自動／手動。": "Works without the phone: tap to change speed, double-tap to change profile, hold to switch auto and manual.",
+  "團隊模式與無線更新": "Team mode and wireless updates",
+  "一支手機同時監看多件背心，依風險排序；韌體用 Wi-Fi 更新，不用拆外殼。": "One phone watches several vests at once, sorted by risk. Firmware updates over Wi-Fi without opening the case.",
+  "用常見零件做得出來": "Built from common parts",
+  "以市售 12V 空調服為基礎，加上一個小控制盒，零件都買得到。": "It starts from a store-bought 12V fan jacket and adds a small control box. Every part is easy to buy.",
+  "微控制器": "Microcontroller", "ESP32 DevKit（藍牙 BLE）": "ESP32 DevKit (Bluetooth LE)",
+  "風扇": "Fans", "4 × 12V，上下兩組": "4 × 12V, upper and lower pairs",
+  "驅動": "Drivers", "D4184 MOSFET × 2，PWM 1kHz": "2 × D4184 MOSFET, 1kHz PWM",
+  "電源": "Power", "12V 電池（DC 給風扇、USB 給 ESP32）": "12V battery (DC for fans, USB for the ESP32)",
+  "保護": "Protection", "3A 保險絲、1N5819 × 2": "3A fuse, 2 × 1N5819",
+  "溫濕度": "Temperature and humidity", "DHT11（體感溫度）": "DHT11 (feels-like temperature)",
+  "心率": "Heart rate", "類比 PulseSensor（也支援 MAX30102）": "Analog PulseSensor (MAX30102 also supported)",
+  "電流電壓": "Current and voltage",
+  "操作與提示": "Controls and alerts", "TTP223 觸控、WS2812B、蜂鳴器": "TTP223 touch pad, WS2812B, buzzer",
+  "Web Bluetooth，中英雙語": "Web Bluetooth, Chinese and English",
+  "先在手機上試試看": "Try it on your phone",
+  "控制頁有示範模式，不用背心也能看到溫度變化時，風速、警示與心率怎麼反應。": "The control page has a demo mode, so you can see how fan speed, alerts and heart rate respond to temperature without a vest.",
+  "開啟示範模式": "Open demo mode", "團隊模式示範": "Team mode demo",
+  "智能溫控風扇背心 · ESP32 開源專案": "Smart Cooling Vest · open-source ESP32 project",
+  "心率數值僅供參考，不是醫療器材。": "Heart-rate readings are for reference only. This is not a medical device.",
+  "把市售空調服改裝成依體感溫度與心率自動調速的風扇背心：ESP32、四顆 12V 風扇分區控制、中暑與心率警報、手機藍牙控制。": "A store-bought fan jacket rebuilt to set its fan speed from feels-like temperature and heart rate: ESP32, four 12V fans in two zones, heat and heart-rate alerts, Bluetooth phone control.",
+};
+const I18N_PAGE = (() => {
+  const KEY = 'fv-lang';
+  const nodes = [];   // [文字節點, 中文]
+  const attrs = [];   // [元素, 屬性, 中文]
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode());) {
+    const zh = n.nodeValue.trim();
+    if (zh && EN[zh]) nodes.push([n, n.nodeValue]);
+  }
+  for (const el of document.querySelectorAll('[title],[aria-label],meta[name="description"]')) {
+    for (const a of ['title', 'aria-label', 'content']) {
+      const v = el.getAttribute(a);
+      if (v && EN[v]) attrs.push([el, a, v]);
+    }
+  }
+  const zhTitle = document.title;
+  let lang = null;
+  try { lang = localStorage.getItem(KEY); } catch (_) { /* 只影響記住語言 */ }
+  if (lang !== 'zh' && lang !== 'en') lang = (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+  const btn = document.getElementById('langBtn');
+  function apply() {
+    const en = lang === 'en';
+    for (const [n, zh] of nodes) n.nodeValue = en ? zh.replace(zh.trim(), EN[zh.trim()]) : zh;
+    for (const [el, a, zh] of attrs) el.setAttribute(a, en ? EN[zh] : zh);
+    document.title = en ? EN[zhTitle] : zhTitle;
+    document.documentElement.lang = en ? 'en' : 'zh-Hant';
+    btn.textContent = en ? '中' : 'EN';
+    btn.setAttribute('aria-label', en ? '切換成中文' : 'Switch to English');
+    const frame = document.getElementById('figure');
+    const src = en ? 'figure-en.html' : 'figure.html';
+    if (!frame.getAttribute('src').endsWith(src)) frame.setAttribute('src', src);
+  }
+  btn.addEventListener('click', () => {
+    lang = lang === 'en' ? 'zh' : 'en';
+    try { localStorage.setItem(KEY, lang); } catch (_) { /* 只影響記住語言 */ }
+    apply();
+  });
+  apply();
+  return { get lang() { return lang; } };
+})();
+
 // 互動立體圖：依內容高度調整 iframe，手機上不留空白
 (() => {
   const frame = document.getElementById('figure');

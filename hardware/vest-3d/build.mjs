@@ -13,6 +13,8 @@ const { kitScript } = await import(pathToFileURL(join(KIT, "scripts/inline-kit.m
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const theme = process.argv.includes("--light") ? "light" : "dark";
+const EN = process.argv.includes("--en");
+const tr = (zh, en) => (EN ? en : zh);
 const WIDTH = 640;
 const HEIGHT = 560;
 
@@ -150,7 +152,7 @@ function fan(f) {
   out.push(L(G.spokesOf(F, FAN_T + 0.2, 4.4, FAN_R - 3, 4, P, { phase: Math.PI / 4 }), { tone: "lo" }));
   out.push(D(G.dotsOf(F, FAN_T, FAN_R - 1.5, 4, P, { all: true, phase: Math.PI / 4 }), { size: 0.5 }));
   out.push(D([at(G.pointOf(F, FAN_T + 0.2, 0, 0))], { size: 0.6, tone: "hi" }));
-  return titled({ id: f.id, zh: `風扇 ${f.id.slice(1)}（${f.zone === "upper" ? "上方" : "下方"}，12V）` }, out.join(""));
+  return titled({ id: f.id, zh: tr(`風扇 ${f.id.slice(1)}（${f.zone === "upper" ? "上方" : "下方"}，12V）`, `Fan ${f.id.slice(1)} (${f.zone}, 12V)`) }, out.join(""));
 }
 
 // ---------- 溫濕度感測器（背面上緣） ----------
@@ -158,7 +160,7 @@ function dht() {
   const plan = { x: -8, y: BACK, w: 16, d: 3, r: 0.8 };
   const out = [S(k.slabOf(plan, 184, 14, P, 3, 0.4), { tone: "hi" })];
   for (let i = 0; i < 4; i++) out.push(L(path3([[-5 + i * 3.4, BACK + 3, 187], [-5 + i * 3.4, BACK + 3, 195]]), { tone: "lo" }));
-  return titled({ id: "dht", zh: "DHT11 溫濕度感測器" }, out.join(""));
+  return titled({ id: "dht", zh: tr("DHT11 溫濕度感測器", "DHT11 temperature and humidity sensor") }, out.join(""));
 }
 
 // ---------- 右腰：電池盒與控制盒 ----------
@@ -174,7 +176,7 @@ function battery() {
   out.push(L(k.ring(BATT.x + BATT.w / 2, BATT.y + 18, 1.2, BATT_Z + BATT_H + 3, P, 12), { tone: "lo" }));
   out.push(S(k.slabOf({ x: BATT.x + 4, y: BATT.y + 5, w: 8, d: 4, r: 1 }, BATT_Z + BATT_H, 1.2, P, 2), { tone: "lo" })); // USB 孔
   out.push(L(path3([[fx, BATT.y + 3, BATT_Z + 8], [fx, BATT.y + BATT.d - 3, BATT_Z + 8]]), { tone: "faint" }));
-  return titled({ id: "battery", zh: "12V 電池盒（DC 輸出接風扇、USB 供電給 ESP32）" }, out.join(""));
+  return titled({ id: "battery", zh: tr("12V 電池盒（DC 輸出接風扇、USB 供電給 ESP32）", "12V battery pack (DC to the fans, USB to the ESP32)") }, out.join(""));
 }
 function controlBox() {
   const out = [S(k.slabOf(BOX, BOX_Z, BOX_H, P, 4, 0.8), { tone: "mid" })];
@@ -188,24 +190,24 @@ function controlBox() {
   // 線材出口
   out.push(S(k.cylinder(BOX.x + 6.5, BOX.y + 8, 2.4, BOX_Z + BOX_H, 3, P, 18), { tone: "lo" }));
   out.push(S(k.cylinder(BOX.x + 6.5, BOX.y + 22, 2.4, BOX_Z + BOX_H, 3, P, 18), { tone: "lo" }));
-  return titled({ id: "box", zh: "控制盒：ESP32、D4184 ×2、INA219、保險絲、1N5819" }, out.join(""));
+  return titled({ id: "box", zh: tr("控制盒：ESP32、D4184 ×2、INA219、保險絲、1N5819", "Control box: ESP32, 2 × D4184, INA219, fuse, 1N5819") }, out.join(""));
 }
 
 // ---------- 肩上：觸控、狀態燈、蜂鳴器；領口：心率 ----------
 function shoulder() {
   const out = [];
   const pad = { x: 30, y: -16, w: 18, d: 14, r: 1.2 };
-  out.push(titled({ id: "touch", zh: "觸控按鈕（TTP223）：碰一下換風速、按住切換自動／手動" },
+  out.push(titled({ id: "touch", zh: tr("觸控按鈕（TTP223）：碰一下換風速、按住切換自動／手動", "Touch button (TTP223): tap to change speed, hold to switch auto and manual") },
     S(k.slabOf(pad, SHOULDER, 1.8, P, 3, 0.4), { tone: "hi" }) +
     L([2, 3.6, 5.2].map((r) => k.ring(pad.x + 7, pad.y + 7, r, SHOULDER + 1.8, P, 28)).join(""), { tone: "lo" }) +
     D([at([pad.x + 7, pad.y + 7, SHOULDER + 1.8])], { size: 0.5, tone: "mid" })));
-  out.push(titled({ id: "led", zh: "WS2812B 狀態燈：顏色代表溫度等級" },
+  out.push(titled({ id: "led", zh: tr("WS2812B 狀態燈：顏色代表溫度等級", "WS2812B status light: its colour shows the temperature level") },
     S(k.cylinder(43, 6, 4.4, SHOULDER, 2, P, 24), { tone: "mid" }) +
     `<path data-part="led-dome" class="vest-led" d="${k.cylinder(43, 6, 2.8, SHOULDER + 2, 1.6, P, 24).fill}"/>`));
-  out.push(titled({ id: "buzzer", zh: "蜂鳴器：中暑、心率、喝水提醒" },
+  out.push(titled({ id: "buzzer", zh: tr("蜂鳴器：中暑、心率、喝水提醒", "Buzzer: heat, heart-rate and drink reminders") },
     S(k.cylinder(-40, 4, 6, SHOULDER, 5, P, 32, 0.5), { tone: "mid" }) +
     L(k.ring(-40, 4, 1.6, SHOULDER + 5, P, 16) + k.ring(-40, 4, 4, SHOULDER + 5, P, 24), { tone: "lo" })));
-  out.push(titled({ id: "pulse", zh: "心率感測器（類比 PulseSensor）：貼在領口內側" },
+  out.push(titled({ id: "pulse", zh: tr("心率感測器（類比 PulseSensor）：貼在領口內側", "Pulse sensor (analog PulseSensor) inside the collar") },
     S(k.cylinder(0, 11, 3.4, SHOULDER + 7.2, 1.4, P, 24), { tone: "hi" }) +
     D([at([0, 11, SHOULDER + 8.6])], { size: 0.7, tone: "hi" })));
   return out.join("");
@@ -251,7 +253,7 @@ function phone() {
   out.push(k.faceTextSvg(k.topMatrix([c[0], c[1] + 2], 3.6, P, "x"), "—", { size: 4.2, tone: "hi", anchor: "middle" }).replace("<text", '<text data-part="phone-temp"'));
   for (let i = 0; i < 3; i++) out.push(L(k.lineOnTop([PHONE.x + 7, PHONE.y + 40 + i * 5], [PHONE.x + PHONE.w - 7, PHONE.y + 40 + i * 5], 3.6, P), { tone: "faint", free: "both" }));
   out.push(D([at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d - 4, 3.4])], { size: 0.6, tone: "lo" }));
-  return titled({ id: "phone", zh: "手機控制頁（藍牙 BLE）" }, out.join(""));
+  return titled({ id: "phone", zh: tr("手機控制頁（藍牙 BLE）", "Phone control page (Bluetooth LE)") }, out.join(""));
 }
 
 // ---------- 組合（由後往前畫） ----------
@@ -259,7 +261,7 @@ const fansSorted = [...FANS].sort((a, b) => k.depthOf([a.x, BACK, a.z], P) - k.d
 const svg = k.figureSvg({
   width: WIDTH,
   height: HEIGHT,
-  label: "智能溫控風扇背心的成品立體圖：背心穿在展示架上，背後上下各兩顆 12V 風扇，右腰是電池盒與控制盒，肩上有觸控按鈕、狀態燈與蜂鳴器，領口內側有心率感測器，底座上放著顯示即時溫度的手機。",
+  label: tr("智能溫控風扇背心的成品立體圖：背心穿在展示架上，背後上下各兩顆 12V 風扇，右腰是電池盒與控制盒，肩上有觸控按鈕、狀態燈與蜂鳴器，領口內側有心率感測器，底座上放著顯示即時溫度的手機。", "The finished smart cooling vest on a display stand: two 12V fans high and two low on the back, a battery pack and control box at the right hip, a touch button, status light and buzzer on the shoulder, a pulse sensor inside the collar, and a phone on the base showing the live temperature."),
   body: [base(), phone(), stand(), vestBody(), dht(), ...fansSorted.map(fan), battery(), controlBox(), cables(), mannequinNeck(), shoulder()],
 });
 
@@ -267,7 +269,9 @@ const svg = k.figureSvg({
 const bladeFrames = Object.fromEntries(FANS.map((f) => [f.id, Array.from({ length: PHASES }, (_, i) => bladesAt(f, (i / PHASES) * (Math.PI * 2 / BLADES)))]));
 const phoneC = [PHONE.x + PHONE.w / 2, PHONE.y + 22];
 
+const words = EN ? { inside: "Inside ", upper: "upper ", lower: "lower ", hr: "heart ", alert: " (alert)" } : { inside: "背心內 ", upper: "上方 ", lower: "下方 ", hr: "心率 ", alert: "（警報）" };
 const live = `
+const W = ${JSON.stringify(words)};
 const P = ${JSON.stringify(P)};
 const T0 = ${T0}, T1 = ${T1}, T2 = ${T2}, DUTY_MIN = ${DUTY_MIN}, BOOST = ${BOOST}, HR_HIGH = ${HR_HIGH};
 const FRAMES = ${JSON.stringify(bladeFrames)};
@@ -309,7 +313,7 @@ function draw(fans) {
   arc.setAttribute("d", arcPath(Math.max(fans.upper, fans.lower)));
   const hr = hrFor(temp);
   ptemp.textContent = temp.toFixed(1) + "°";
-  const text = "背心內 " + temp.toFixed(1) + "°C · 上方 " + fans.upper + "% · 下方 " + fans.lower + "% · 心率 " + hr + " bpm" + (hr >= HR_HIGH ? "（警報）" : "");
+  const text = W.inside + temp.toFixed(1) + "°C · " + W.upper + fans.upper + "% · " + W.lower + fans.lower + "% · " + W.hr + hr + " bpm" + (hr >= HR_HIGH ? W.alert : "");
   if (readout.textContent !== text) readout.textContent = text;
   stage.setAttribute("aria-valuenow", temp.toFixed(1));
   stage.setAttribute("aria-valuetext", text);
@@ -342,18 +346,17 @@ draw(fansFor(temp));
 const css = `<style>.vest-blade{fill:var(--anatomy-hi);fill-opacity:.35;stroke:var(--anatomy-lit);stroke-width:.7;stroke-linejoin:round}.vest-led{fill:#0078ff;stroke:var(--anatomy-hi);stroke-width:.6;filter:drop-shadow(0 0 3px currentColor)}</style>`;
 const body = css + k.plateHtml({
   fig: "Fig 1",
-  title: "智能溫控風扇背心",
-  hint: "左右移動滑鼠改變溫度；方向鍵每次 1°C",
-  readout: "背心內 25.0°C · 上方 0% · 下方 0%",
+  title: tr("智能溫控風扇背心", "Smart cooling vest"),
+  hint: tr("左右移動滑鼠改變溫度；方向鍵每次 1°C", "Move left and right to change the temperature; arrow keys step 1°C"),
+  readout: tr("背心內 25.0°C · 上方 0% · 下方 0%", "Inside 25.0°C · upper 0% · lower 0%"),
   keys: [
-    { mark: "lit", label: "扇葉：依體感溫度自動調速（28°C 啟動、35°C 全速，下方多 10%）" },
-    { mark: "raised", label: "背後四顆 12V 風扇、右腰電池盒與控制盒、肩上觸控按鈕／狀態燈／蜂鳴器、領口心率感測器" },
+    { mark: "lit", label: tr("扇葉：依體感溫度自動調速（28°C 啟動、35°C 全速，下方多 10%）", "Fan blades: speed follows the feels-like temperature (start at 28°C, full at 35°C, lower fans +10%)") },
+    { mark: "raised", label: tr("背後四顆 12V 風扇、右腰電池盒與控制盒、肩上觸控按鈕／狀態燈／蜂鳴器、領口心率感測器", "Four 12V fans on the back, battery and control box at the hip, touch button, light and buzzer on the shoulder, pulse sensor at the collar") },
   ],
-  caption:
-    "市售空調服改裝成溫控風扇背心。控制盒裡的 ESP32 讀取 DHT11 溫濕度、算出體感溫度，透過兩個 D4184 分別調整上方與下方風扇；INA219 量電流與電池電量，心率感測器貼在領口內側。狀態燈依溫度由藍、黃、橘變紅，手機用藍牙即時顯示。把滑鼠移到零件上可以看到名稱。",
-  body: `<div class="iso-stage" tabindex="0" role="slider" aria-label="風扇背心：方向鍵調整背心內溫度" aria-valuemin="22" aria-valuemax="40" aria-valuenow="25">${svg}</div>`,
+  caption: tr("市售空調服改裝成溫控風扇背心。控制盒裡的 ESP32 讀取 DHT11 溫濕度、算出體感溫度，透過兩個 D4184 分別調整上方與下方風扇；INA219 量電流與電池電量，心率感測器貼在領口內側。狀態燈依溫度由藍、黃、橘變紅，手機用藍牙即時顯示。把滑鼠移到零件上可以看到名稱。", "A store-bought fan jacket rebuilt as a temperature-controlled vest. The ESP32 in the control box reads the DHT11, works out the feels-like temperature and drives the upper and lower fans through two D4184 drivers; an INA219 measures current and battery level, and a pulse sensor sits inside the collar. The status light goes from blue through yellow and orange to red, and the phone shows it all live over Bluetooth. Point at a part to see its name."),
+  body: `<div class="iso-stage" tabindex="0" role="slider" aria-label="${tr("風扇背心：方向鍵調整背心內溫度", "Fan vest: arrow keys change the temperature inside the vest")}" aria-valuemin="22" aria-valuemax="40" aria-valuenow="25">${svg}</div>`,
 });
 
-const name = theme === "light" ? "vest-3d-light.html" : "vest-3d.html";
-writeFileSync(join(HERE, name), k.pageHtml({ title: "智能溫控風扇背心", theme, body, script: kitScript() + live }));
+const name = `vest-3d${EN ? "-en" : ""}${theme === "light" ? "-light" : ""}.html`;
+writeFileSync(join(HERE, name), k.pageHtml({ title: tr("智能溫控風扇背心", "Smart cooling vest"), theme, body, script: kitScript() + live }));
 console.log("wrote", name);
